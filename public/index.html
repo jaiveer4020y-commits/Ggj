@@ -1,109 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <title>Netflix Style ArtPlayer</title>
-
-    <style>
-        body {
-            margin: 0;
-            background: #000;
-            font-family: Arial, Helvetica, sans-serif;
-        }
-
-        .artplayer-app {
-            width: 100%;
-            max-width: 900px;
-            height: 506px;
-            margin: 40px auto;
-            background: #000;
-            position: relative;
-        }
-
-        .status {
-            color: #aaa;
-            text-align: center;
-            margin-top: 10px;
-            font-size: 14px;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>ArtPlayer Stream</title>
+<style>
+body { margin:0; background:#000; font-family:Arial }
+.artplayer-app {
+    width:100%;
+    max-width:900px;
+    height:506px;
+    margin:40px auto;
+    background:#000;
+}
+#status {
+    text-align:center;
+    color:#aaa;
+    font-size:14px;
+}
+</style>
 </head>
 
 <body>
 
 <div class="artplayer-app"></div>
-<div class="status" id="status">Initializing…</div>
+<div id="status">Initializing…</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@swarmcloud/hls/hls.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/artplayer@5.0.9/dist/artplayer.js"></script>
 
 <script>
 (async () => {
-    const statusEl = document.getElementById('status');
+    const statusEl = document.getElementById("status");
 
-    // 🔹 Get title from URL (supports BOTH title & tittle)
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const title =
         params.get("title") ||
         params.get("tittle") ||
         "wednesday.s02e05";
 
-    statusEl.textContent = `Waiting 5 seconds before requesting stream for "${title}"…`;
+    statusEl.textContent = `Waiting 5 seconds… (${title})`;
 
-    // ⏳ 5 SECOND DELAY
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    // ⏳ 5 second delay
+    await new Promise(r => setTimeout(r, 5000));
 
-    // 🔹 Render API
+    // ✅ Render API THROUGH proxy
     const renderApi =
-        `https://u-1-1azw.onrender.com/api/get-stream?title=${encodeURIComponent(title)}`;
+        "https://workingg.vercel.app/api/proxy?url=" +
+        encodeURIComponent(
+            "https://u-1-1azw.onrender.com/api/get-stream?title=" + title
+        );
 
-    statusEl.textContent = "Requesting stream…";
+    statusEl.textContent = "Fetching stream info…";
 
-    let json;
+    let data;
     try {
         const res = await fetch(renderApi);
-        json = await res.json();
-    } catch (err) {
-        statusEl.textContent = "Failed to reach Render API";
-        console.error(err);
+        data = await res.json();
+    } catch (e) {
+        statusEl.textContent = "Render API blocked or offline";
+        console.error(e);
         return;
     }
 
-    if (!json || !json.m3u8_url) {
+    if (!data?.m3u8_url) {
         statusEl.textContent = "Stream not found";
         return;
     }
 
-    // 🔹 Wrap m3u8 with proxy
-    const proxiedM3u8 =
-        `https://workingg.vercel.app/api/proxy?url=${encodeURIComponent(json.m3u8_url)}`;
+    // ✅ Wrap final m3u8 with proxy
+    const finalUrl =
+        "https://workingg.vercel.app/api/proxy?url=" +
+        encodeURIComponent(data.m3u8_url);
 
-    statusEl.textContent = "Loading player…";
+    statusEl.textContent = "Starting player…";
 
-    // 🔹 ArtPlayer
-    const art = new Artplayer({
-        container: '.artplayer-app',
-        url: proxiedM3u8,
-        type: 'm3u8',
+    new Artplayer({
+        container: ".artplayer-app",
+        url: finalUrl,
+        type: "m3u8",
         autoplay: true,
         playsInline: true,
+        theme: "#e50914",
         fullscreen: true,
         fullscreenWeb: true,
-        theme: '#e50914',
         pip: true,
-        screenshot: true,
-        playbackRate: true,
-        aspectRatio: true,
-        airplay: true,
-        autoSize: true,
         setting: true,
         customType: {
-            m3u8: (video, url) => {
+            m3u8(video, url) {
                 if (Hls.isSupported()) {
-                    const hls = new Hls({
-                        enableWorker: true,
-                        lowLatencyMode: true,
-                    });
+                    const hls = new Hls();
                     hls.loadSource(url);
                     hls.attachMedia(video);
                 } else {
@@ -113,10 +98,7 @@
         }
     });
 
-    art.on('ready', () => {
-        statusEl.textContent = `Now Playing: ${title}`;
-    });
-
+    statusEl.textContent = `Playing: ${title}`;
 })();
 </script>
 
