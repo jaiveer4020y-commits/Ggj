@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Netflix UI Player</title>
+
+<style>
+body { margin:0; background:#000; font-family:Helvetica,Arial }
+.artplayer-app { width:100%; height:100vh; background:#000 }
+.netflix-header {
+  position:absolute; top:0; left:0; right:0;
+  padding:20px; color:#fff;
+  background:linear-gradient(to bottom,rgba(0,0,0,.8),transparent);
+  z-index:10;
+}
+.movie-title { font-size:20px }
+</style>
+</head>
+
+<body>
+
+<div class="netflix-header">
+  <div class="movie-title" id="title">Loading...</div>
+</div>
+<div class="artplayer-app"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@swarmcloud/hls/hls.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/artplayer@5.0.9/dist/artplayer.js"></script>
+
+<script>
+const slug = location.pathname.split('/').pop();
+document.getElementById("title").innerText = slug.replaceAll('.', ' ');
+
+const STREAM_URL = `/api/play?title=${slug}`;
+
+new Artplayer({
+  container: '.artplayer-app',
+  url: STREAM_URL,
+  type: 'm3u8',
+  autoplay: true,
+  fullscreen: true,
+  fullscreenWeb: true,
+  playsInline: true,
+  pip: true,
+  theme: '#e50914',
+  customType: {
+    m3u8(video, url) {
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(video);
+      } else {
+        video.src = url;
+      }
+    }
+  }
+});
+</script>
+
+</body>
+</html>
