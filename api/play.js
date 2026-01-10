@@ -6,7 +6,7 @@ import crypto from "crypto";
 
 const DOMAIN = "https://watchout.rpmvid.com";
 const UA =
-  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)";
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
 const KEY = Buffer.from("6b69656d7469656e6d75613931316361", "hex");
 const IV = Buffer.from("313233343536373839306f6975797472", "hex");
@@ -14,10 +14,12 @@ const IV = Buffer.from("313233343536373839306f6975797472", "hex");
 /* ───────── helpers ───────── */
 
 async function getVideoId(title) {
-  const url = `https://hlsworker.watchoutofficial2006.workers.dev/?title=${encodeURIComponent(
-    title
-  )}`;
-  const r = await fetch(url);
+  const r = await fetch(
+    `https://hlsworker.watchoutofficial2006.workers.dev/?title=${encodeURIComponent(
+      title
+    )}`,
+    { headers: { "User-Agent": UA } }
+  );
   const j = await r.json();
   return j?.result?.files?.[0]?.file_code;
 }
@@ -33,7 +35,7 @@ function decrypt(hex) {
 
 async function extractM3U8(id) {
   const r = await fetch(`${DOMAIN}/api/v1/video?id=${id}`, {
-    headers: { Referer: DOMAIN, "User-Agent": UA },
+    headers: { Referer: DOMAIN, Origin: DOMAIN, "User-Agent": UA },
   });
   const enc = await r.text();
   return decrypt(enc).source;
@@ -56,14 +58,21 @@ function rewrite(m3u8, base, host) {
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
-  /* segment proxy */
+  /* SEGMENT + PLAYLIST PROXY */
   if (req.query.proxy && req.query.url) {
     const u = decodeURIComponent(req.query.url);
+
     const r = await fetch(u, {
-      headers: { Referer: DOMAIN, Origin: DOMAIN, "User-Agent": UA },
+      headers: {
+        Referer: DOMAIN,
+        Origin: DOMAIN,
+        "User-Agent": UA,
+        Accept: "*/*",
+      },
     });
 
     const ct = r.headers.get("content-type") || "";
+
     if (ct.includes("mpegurl")) {
       let t = await r.text();
       t = rewrite(
@@ -76,10 +85,11 @@ export default async function handler(req, res) {
     }
 
     res.setHeader("Content-Type", ct);
+    res.setHeader("Cache-Control", "no-store");
     return res.send(Buffer.from(await r.arrayBuffer()));
   }
 
-  /* auto extract */
+  /* AUTO EXTRACT */
   let id = req.query.video_id;
   if (!id && req.query.title) id = await getVideoId(req.query.title);
   if (!id) return res.status(400).send("Missing title or video_id");
@@ -87,12 +97,12 @@ export default async function handler(req, res) {
   const m3u8 = await extractM3U8(id);
   const base = m3u8.substring(0, m3u8.lastIndexOf("/") + 1);
 
-  const proxied = rewrite(
+  const playlist = rewrite(
     await (await fetch(m3u8)).text(),
     base,
     `https://${req.headers.host}`
   );
 
   res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-  res.send(proxied);
+  res.send(playlist);
 }
