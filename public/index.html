@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>Netflix UI Player</title>
+    <title>Netflix Style Player</title>
 
     <style>
         body {
@@ -15,7 +15,7 @@
             width: 100%;
             max-width: 960px;
             height: 540px;
-            margin: 40px auto;
+            margin: 30px auto;
             background: #000;
             position: relative;
         }
@@ -46,6 +46,13 @@
             text-transform: capitalize;
         }
 
+        .error {
+            color: #fff;
+            text-align: center;
+            margin-top: 100px;
+            font-size: 18px;
+        }
+
         .netflix-spinner {
             width: 50px;
             animation: spin 1s linear infinite;
@@ -72,9 +79,9 @@
 <script src="https://cdn.jsdelivr.net/npm/artplayer@5.0.9/dist/artplayer.js"></script>
 
 <script>
-/* ─────────────────────────────────────────────
-   1️⃣ GET SLUG FROM URL (VERCEL SAFE)
-───────────────────────────────────────────── */
+/* ───────────────────────────────
+   1️⃣ SLUG (VERCEL SAFE)
+─────────────────────────────── */
 const slug =
   decodeURIComponent(window.location.pathname.replace(/^\/+/, "")) ||
   "stranger.things.s05e06";
@@ -82,63 +89,70 @@ const slug =
 document.getElementById("title").innerText =
   slug.replaceAll(".", " ");
 
-/* ─────────────────────────────────────────────
+/* ───────────────────────────────
    2️⃣ API + PROXY
-───────────────────────────────────────────── */
+─────────────────────────────── */
 const RENDER_API =
   "https://u-1-1azw.onrender.com/api/get-stream?title=";
 
 const PROXY =
   "https://workingg.vercel.app/api/proxy?url=";
 
-/* ─────────────────────────────────────────────
-   3️⃣ INIT PLAYER
-───────────────────────────────────────────── */
+/* ───────────────────────────────
+   3️⃣ FETCH + PLAY
+─────────────────────────────── */
 (async () => {
-  try {
-    const res = await fetch(RENDER_API + slug);
-    const data = await res.json();
+    try {
+        const res = await fetch(RENDER_API + slug);
+        const data = await res.json();
 
-    const m3u8 =
-      data.m3u8_url || data.streamUrl || data.url;
+        console.log("API RESPONSE:", data);
 
-    if (!m3u8) throw "No stream";
+        if (!data.success || !data.m3u8_url) {
+            throw new Error("Stream not found");
+        }
 
-    const finalUrl = PROXY + encodeURIComponent(m3u8);
+        const finalUrl =
+            PROXY + encodeURIComponent(data.m3u8_url);
 
-    const art = new Artplayer({
-        container: ".artplayer-app",
-        url: finalUrl,
-        type: "m3u8",
-        autoplay: true,
-        autoSize: true,
-        fullscreen: true,
-        fullscreenWeb: true,
-        theme: "#e50914",
-        playbackRate: true,
-        pip: true,
-        setting: true,
-        airplay: true,
-        mutex: true,
-        backdrop: true,
-        icons: {
-            loading:
-              '<img class="netflix-spinner" src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png">'
-        },
-        customType: {
-            m3u8(video, url) {
-                if (Hls.isSupported()) {
-                    const hls = new Hls();
-                    hls.loadSource(url);
-                    hls.attachMedia(video);
+        const art = new Artplayer({
+            container: ".artplayer-app",
+            url: finalUrl,
+            type: "m3u8",
+            autoplay: true,
+            autoSize: true,
+            fullscreen: true,
+            fullscreenWeb: true,
+            theme: "#e50914",
+            playbackRate: true,
+            pip: true,
+            setting: true,
+            airplay: true,
+            mutex: true,
+            backdrop: true,
+            icons: {
+                loading:
+                  '<img class="netflix-spinner" src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png">'
+            },
+            customType: {
+                m3u8(video, url) {
+                    if (Hls.isSupported()) {
+                        const hls = new Hls();
+                        hls.loadSource(url);
+                        hls.attachMedia(video);
+                    } else {
+                        video.src = url;
+                    }
                 }
             }
-        }
-    });
+        });
 
-  } catch (e) {
-    document.getElementById("title").innerText = "Stream Not Found";
-  }
+    } catch (err) {
+        console.error(err);
+        document.querySelector(".artplayer-app").innerHTML =
+            `<div class="error">Stream Not Found</div>`;
+        document.getElementById("title").innerText = "Stream Not Found";
+    }
 })();
 </script>
 
