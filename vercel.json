@@ -1,16 +1,35 @@
 {
   "version": 2,
-  "routes": [
-    { "src": "/api/play", "dest": "/api/play.js" },
-    { "src": "/(.*)", "dest": "/pages/[...slug].html" }
+  "rewrites": [
+    {
+      "source": "/api/play",
+      "destination": "/api/play.js"
+    },
+    {
+      "source": "/:slug",
+      "destination": "/pages/[...slug].html"
+    }
   ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "*" }
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "*"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "cross-origin"
+        }
       ]
     }
   ]
