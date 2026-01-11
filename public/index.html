@@ -1,201 +1,221 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>ArtPlayer Full</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, maximum-scale=1"
+/>
+<title>Player</title>
 
-<!-- ✅ ARTPLAYER CSS (UNPKG – WORKS ON VERCEL) -->
-<link rel="stylesheet" href="https://unpkg.com/artplayer@5.1.2/dist/artplayer.css">
+<!-- ================= ArtPlayer 5.3.0 ================= -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/artplayer@5.3.0/dist/artplayer.css"
+/>
+
+<script src="https://unpkg.com/hls.js@1.5.17/dist/hls.min.js"></script>
+<script src="https://unpkg.com/artplayer@5.3.0/dist/artplayer.js"></script>
 
 <style>
 html, body {
-    margin: 0;
-    padding: 0;
-    background: black;
-    width: 100%;
-    height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #000;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
+
 #player {
-    width: 100%;
-    height: 100%;
-    background: black;
-    position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
 }
-.spinner {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 64px;
-    height: 64px;
-    margin: -32px;
-    border: 4px solid rgba(255,255,255,.2);
-    border-top-color: #e50914;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    z-index: 99;
+
+/* Netflix-style spinner */
+.netflix-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  border: 5px solid rgba(255,255,255,0.2);
+  border-top-color: red;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: spin 1s linear infinite;
+  z-index: 9999;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
 </style>
 </head>
 
 <body>
-<div id="player">
-    <div class="spinner" id="spinner"></div>
-</div>
 
-<!-- ✅ LIBRARIES (PINNED & SAFE) -->
-<script src="https://unpkg.com/hls.js@1.5.17/dist/hls.min.js"></script>
-<script src="https://unpkg.com/artplayer@5.1.2/dist/artplayer.js"></script>
+<div id="player"></div>
+<div id="spinner" class="netflix-spinner"></div>
 
 <script>
-/* ======================================================
-   CONFIG
-====================================================== */
-const PROXY = "https://workingg.vercel.app/api/proxy?url=";
-const STREAM_API = "https://u-1-1azw.onrender.com/api/get-stream?title=";
-const SUB_API = "https://sub.wyzie.ru/search";
+/* ================== CONFIG ================== */
+const RENDER_API =
+  "https://u-1-1azw.onrender.com/api/get-stream";
 
-/* ======================================================
-   SLUG DETECTION (FIXED)
-====================================================== */
-const qs = new URLSearchParams(location.search);
+const PROXY =
+  "https://workingg.vercel.app/api/proxy?url=";
 
-const TITLE   = qs.get("title");    // wednesday.s01e02
-const IMDB    = qs.get("id");       // tt4574334
-const SEASON  = qs.get("season");   // 1
-const EPISODE = qs.get("episode");  // 2
+const SUB_API =
+  "https://sub.wyzie.ru/search";
 
-if (!TITLE) {
-    alert("Missing ?title=");
-    throw new Error("Missing title");
+/* ================== UTIL ================== */
+function qs(name) {
+  const u = new URLSearchParams(location.search);
+  return u.get(name) || u.get(name?.toLowerCase());
 }
 
-/* ======================================================
-   HELPERS
-====================================================== */
-const proxy = url => PROXY + encodeURIComponent(url);
-const hideSpinner = () =>
-    document.getElementById("spinner").style.display = "none";
-
-/* ======================================================
-   FETCH STREAM
-====================================================== */
-async function getStream() {
-    const r = await fetch(proxy(STREAM_API + TITLE));
-    const j = await r.json();
-
-    if (!j || !j.m3u8_url) throw "NO STREAM";
-
-    return {
-        url: proxy(j.m3u8_url),
-        headers: j.headers || {}
-    };
+function showSpinner(show) {
+  document.getElementById("spinner").style.display =
+    show ? "block" : "none";
 }
 
-/* ======================================================
-   FETCH SUBTITLES
-====================================================== */
-async function getSubtitles() {
-    if (!IMDB) return [];
+/* ================== SLUG DETECTION ================== */
+const title =
+  qs("title") || qs("tittle");
 
-    let url = `${SUB_API}?id=${IMDB}`;
-    if (SEASON && EPISODE) {
-        url += `&season=${SEASON}&episode=${EPISODE}`;
-    }
+const imdb =
+  qs("id");
 
-    const r = await fetch(proxy(url));
-    const subs = await r.json();
+const season =
+  qs("season");
 
-    if (!Array.isArray(subs)) return [];
+const episode =
+  qs("episode");
 
-    return subs.map(s => ({
-        html: s.lang,
-        url: proxy(s.url),
-        type: "vtt"
-    }));
+if (!title) {
+  alert("Missing title in URL");
+  throw new Error("Title not found");
 }
 
-/* ======================================================
-   INIT PLAYER
-====================================================== */
+/* ================== FETCH STREAM ================== */
+async function fetchStream() {
+  showSpinner(true);
+
+  const apiUrl =
+    `${RENDER_API}?title=${encodeURIComponent(title)}`;
+
+  const res = await fetch(PROXY + encodeURIComponent(apiUrl));
+  const data = await res.json();
+
+  if (!data || !data.success || !data.m3u8_url) {
+    throw new Error("Stream not found");
+  }
+
+  return PROXY + encodeURIComponent(data.m3u8_url);
+}
+
+/* ================== FETCH SUBTITLES ================== */
+async function fetchSubtitles() {
+  if (!imdb) return [];
+
+  let url = `${SUB_API}?id=${imdb}`;
+  if (season && episode) {
+    url += `&season=${season}&episode=${episode}`;
+  }
+
+  const res = await fetch(PROXY + encodeURIComponent(url));
+  const data = await res.json();
+
+  if (!Array.isArray(data)) return [];
+
+  return data.map((s) => ({
+    name: s.lang || "Subtitle",
+    url: PROXY + encodeURIComponent(s.url),
+    type: "vtt",
+  }));
+}
+
+/* ================== INIT PLAYER ================== */
 (async () => {
-    try {
-        const stream = await getStream();
-        const subtitles = await getSubtitles();
+  const videoUrl = await fetchStream();
+  const subtitles = await fetchSubtitles();
 
-        const art = new Artplayer({
-            container: "#player",
-            url: stream.url,
-            type: "m3u8",
-            autoplay: true,
-            setting: true,
-            fullscreen: true,
-            hotkey: true,
-            pip: true,
-            playbackRate: true,
-            aspectRatio: true,
-            volume: 0.8,
-            mutex: true,
-            autoOrientation: true,
+  const art = new Artplayer({
+    container: "#player",
+    url: videoUrl,
+    autoplay: true,
+    muted: false,
+    pip: true,
+    airplay: true,
+    fullscreen: true,
+    fullscreenWeb: true,
+    playbackRate: true,
+    aspectRatio: true,
+    setting: true,
+    hotkey: true,
+    mutex: true,
+    autoSize: true,
+    fastForward: true,
+    autoPlayback: true,
+    volume: 0.8,
+    subtitle: {
+      url: subtitles[0]?.url || "",
+      type: "vtt",
+      style: {
+        color: "#fff",
+        fontSize: "20px",
+        background: "rgba(0,0,0,0.4)",
+      },
+    },
+    settings: [
+      {
+        name: "Subtitles",
+        html: "Select",
+        selector: subtitles.map((s) => ({
+          name: s.name,
+          value: s.url,
+        })),
+        onSelect(item) {
+          art.subtitle.switch(item.value);
+          return item.name;
+        },
+      },
+    ],
+    customType: {
+      m3u8(video, url) {
+        if (Hls.isSupported()) {
+          const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: false,
+            backBufferLength: 90,
+          });
+          hls.loadSource(url);
+          hls.attachMedia(video);
 
-            customType: {
-                m3u8(video, url) {
-                    if (Hls.isSupported()) {
-                        const hls = new Hls({
-                            enableWorker: true,
-                            backBufferLength: 90
-                        });
-                        hls.loadSource(url);
-                        hls.attachMedia(video);
-                        hls.on(Hls.Events.MANIFEST_PARSED, hideSpinner);
-                    } else {
-                        video.src = url;
-                        hideSpinner();
-                    }
-                }
-            },
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            showSpinner(false);
+          });
 
-            controls: [
-                {
-                    position: "center",
-                    html: `<img src="https://rivestream.org/images/player/backward.svg" width="60">`,
-                    click: () => art.currentTime -= 10
-                },
-                {
-                    position: "center",
-                    html: `<img src="https://rivestream.org/images/player/play.svg" width="70">`,
-                    click: () => art.toggle()
-                },
-                {
-                    position: "center",
-                    html: `<img src="https://rivestream.org/images/player/forward.svg" width="60">`,
-                    click: () => art.currentTime += 10
-                }
-            ]
-        });
-
-        /* ================= SUBTITLE SETTING ================= */
-        if (subtitles.length) {
-            art.setting.add({
-                name: "Subtitles",
-                html: "Select",
-                selector: subtitles.map((s, i) => ({
-                    html: s.html,
-                    value: i
-                })),
-                onSelect(item) {
-                    art.subtitle.switch(subtitles[item.value].url);
-                    return item.html;
-                }
-            });
+          art.hls = hls;
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.src = url;
         }
+      },
+    },
+  });
 
-    } catch (e) {
-        console.error(e);
-        alert("STREAM LOAD FAILED");
-    }
+  art.on("ready", () => {
+    showSpinner(false);
+  });
+
+  art.on("error", () => {
+    showSpinner(false);
+  });
+
 })();
 </script>
+
 </body>
 </html>
