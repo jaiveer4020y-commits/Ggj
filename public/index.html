@@ -5,6 +5,7 @@
 <title>Stream Player</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+<!-- ArtPlayer CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/artplayer@5.1.2/dist/artplayer.css">
 
 <style>
@@ -65,78 +66,88 @@ html, body {
 <body>
 <div id="player"></div>
 
+<!-- HLS.js -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+
+<!-- ArtPlayer JS -->
 <script src="https://cdn.jsdelivr.net/npm/artplayer@5.1.2/dist/artplayer.js"></script>
 
 <script>
 /* ============================================================
-   1️⃣ SLUG DETECTION (FIXED – THIS WAS YOUR MAIN ISSUE)
+   1️⃣ URL PARAM & SLUG DETECTION
 ============================================================ */
 const qs = new URLSearchParams(window.location.search);
 
-const TITLE =
-    (qs.get("title") || qs.get("tittle") || "")
-        .trim()
-        .toLowerCase();
+const TITLE = (qs.get("title") || qs.get("tittle") || "")
+    .trim()
+    .toLowerCase();
 
 const IMDB_ID = qs.get("id") || "";
 const SEASON = qs.get("season");
 const EPISODE = qs.get("episode");
 
 if (!TITLE) {
-    document.body.innerHTML =
-        "<h2 style='color:white;text-align:center'>Missing title slug</h2>";
+    document.body.innerHTML = "<h2 style='color:white;text-align:center'>Missing title slug</h2>";
     throw new Error("TITLE missing");
 }
 
 /* ============================================================
    2️⃣ CONSTANTS
 ============================================================ */
-const STREAM_API =
-    "https://u-1-1azw.onrender.com/api/get-stream?title=" +
-    encodeURIComponent(TITLE);
-
 const PROXY = "https://workingg.vercel.app/api/proxy?url=";
+const STREAM_API = PROXY + encodeURIComponent(
+    "https://u-1-1azw.onrender.com/api/get-stream?title=" + encodeURIComponent(TITLE)
+);
 
 /* ============================================================
-   3️⃣ FETCH STREAM (MASTER.M3U8 ONLY – NO LOOP)
+   3️⃣ FETCH STREAM (THROUGH PROXY)
 ============================================================ */
 async function fetchStream() {
-    const r = await fetch(STREAM_API);
-    if (!r.ok) throw new Error("Stream API failed");
+    try {
+        const r = await fetch(STREAM_API);
+        if (!r.ok) throw new Error("Stream API failed");
 
-    const j = await r.json();
-    if (!j.url) throw new Error("Invalid stream response");
+        const j = await r.json();
+        if (!j.url) throw new Error("Invalid stream response");
 
-    return PROXY + encodeURIComponent(j.url);
+        // Proxy the final .m3u8 URL as well
+        return PROXY + encodeURIComponent(j.url);
+    } catch (err) {
+        console.error("Fetch stream error:", err);
+        document.body.innerHTML = "<h2 style='color:white;text-align:center'>Failed to load stream</h2>";
+        throw err;
+    }
 }
 
 /* ============================================================
-   4️⃣ FETCH SUBTITLES (MOVIE + SERIES)
+   4️⃣ FETCH SUBTITLES (THROUGH PROXY)
 ============================================================ */
 async function fetchSubtitles() {
     if (!IMDB_ID) return [];
 
     let url = "https://sub.wyzie.ru/search?id=" + IMDB_ID;
-    if (SEASON && EPISODE) {
-        url += "&season=" + SEASON + "&episode=" + EPISODE;
+    if (SEASON && EPISODE) url += "&season=" + SEASON + "&episode=" + EPISODE;
+
+    try {
+        const r = await fetch(PROXY + encodeURIComponent(url));
+        if (!r.ok) return [];
+
+        const subs = await r.json();
+        if (!Array.isArray(subs)) return [];
+
+        return subs.map((s, i) => ({
+            html: s.lang || "Subtitle " + (i + 1),
+            url: PROXY + encodeURIComponent(s.url),
+            default: i === 0
+        }));
+    } catch (err) {
+        console.warn("Fetch subtitles failed:", err);
+        return [];
     }
-
-    const r = await fetch(PROXY + encodeURIComponent(url));
-    if (!r.ok) return [];
-
-    const subs = await r.json();
-    if (!Array.isArray(subs)) return [];
-
-    return subs.map((s, i) => ({
-        html: s.lang || "Subtitle " + (i + 1),
-        url: PROXY + encodeURIComponent(s.url),
-        default: i === 0
-    }));
 }
 
 /* ============================================================
-   5️⃣ INIT PLAYER (NO CUT FEATURES)
+   5️⃣ INIT ARTPLAYER
 ============================================================ */
 (async () => {
     const streamUrl = await fetchStream();
@@ -185,15 +196,16 @@ async function fetchSubtitles() {
         }
     });
 
-    /* ========================================================
-       AUDIO & QUALITY (FROM HLS – SETTINGS MENU)
-    ======================================================== */
+    /* ============================================================
+       6️⃣ AUDIO & QUALITY MENU
+    ============================================================ */
     art.on("ready", () => {
         if (!hls) return;
 
         const audioTracks = hls.audioTracks || [];
         const levels = hls.levels || [];
 
+        // Audio tracks
         if (audioTracks.length) {
             art.setting.add({
                 name: "Audio",
@@ -209,6 +221,7 @@ async function fetchSubtitles() {
             });
         }
 
+        // Quality levels
         if (levels.length) {
             art.setting.add({
                 name: "Quality",
