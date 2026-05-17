@@ -11042,24 +11042,24 @@ async function playMovie(item, releaseYear) {
         const movieTitle = item.title;
         const movieId    = item.id;
 
-        // 1️⃣ Try GitHub (Primary)
-        const githubHlsUrl = `https://raw.githubusercontent.com/Watchout2025/api/refs/heads/main/hls/movie/${movieId}`;
+        /// 1️⃣ NEW PRIMARY API: https://jj-seven-gray.vercel.app/movie/{id}
         try {
-            const githubRes = await fetch(githubHlsUrl);
-            if (githubRes.ok) {
-                const fileCode = (await githubRes.text()).trim();
-                if (fileCode) {
-                    playLink = `https://watchout-player.netlify.app/movie/${movieId}`;
-                    source   = 'github';
-                    console.log(`✅ GitHub HLS for "${movieTitle}": ${fileCode}`);
+            const newApiUrl = `https://jj-seven-gray.vercel.app/movie/${movieId}`;
+            const newApiRes = await fetch(newApiUrl);
+            if (newApiRes.ok) {
+                const responseText = await newApiRes.text();
+                if (responseText && responseText.trim().length > 0) {
+                    playLink = newApiUrl;
+                    source = 'VercelPrimary';
+                    console.log(`✅ Vercel Primary API for movie ID ${movieId}: ${playLink}`);
                 } else {
-                    console.warn(`⚠️ GitHub file for "${movieTitle}" is empty or invalid.`);
+                    console.warn(`⚠️ Vercel API returned empty for movie ID ${movieId}`);
                 }
             } else {
-                console.warn(`❌ No GitHub entry found for movie ID ${movieId}.`);
+                console.warn(`❌ Vercel API returned status ${newApiRes.status} for movie ID ${movieId}`);
             }
         } catch (err) {
-            console.error(`⚠️ GitHub fetch error for movie ID ${movieId}:`, err);
+            console.error(`⚠️ Vercel API fetch error for movie ID ${movieId}:`, err);
         }
 
         // 2️⃣ Try RPM Worker — only if GitHub didn't work
