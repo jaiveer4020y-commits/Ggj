@@ -12422,34 +12422,26 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
         const formattedSeriesTitle = formatTitleForHls(seriesName);
         const dottedTitle = `${formattedSeriesTitle}.${formattedSeason}${formattedEpisode}`;
 
-        // ---------------------------------------
-        // 🆕 1️⃣ Try GitHub Direct HLS Link First
-        // ---------------------------------------
-        const githubJsonUrl = `https://raw.githubusercontent.com/Watchout2025/api/refs/heads/main/hls/tv/${seriesId}/S${seasonNumber}.json`;
-
-        try {
-            const res = await fetch(githubJsonUrl);
-            if (res.ok) {
-                const data = await res.json();
-                const fileId = data[episodeNumber];
-                if (fileId) {
-                    let directHlsLink;
-
-                    // ✅ If fileId ends with m3u8, use it directly
-                    if (fileId) {
-                        directHlsLink = fileId;
-                        episodeUrl = `https://watchout-player.netlify.app/tv/${seriesId}/S${seasonNumber}/E${episodeNumber}`;
-                    } else {
-                        
-                    }
-                    isHlsWorkerLink = true;
-                    isGitHubSource = true; // Mark as GitHub source
-                    console.log(`✅ Found episode ${episodeNumber}: ${episodeUrl}`);
-                }
+          // 1️⃣ NEW PRIMARY API: https://jj-seven-gray.vercel.app/tv/{seriesId}/S{seasonNumber}/E{episodeNumber}
+    try {
+        const newApiUrl = `https://jj-seven-gray.vercel.app/tv/${seriesId}/S${seasonNumber}/E${episodeNumber}`;
+        const newApiRes = await fetch(newApiUrl);
+        if (newApiRes.ok) {
+            const responseText = await newApiRes.text();
+            if (responseText && responseText.trim().length > 0) {
+                episodeUrl = newApiUrl;
+                isHlsWorkerLink = true;
+                isGitHubSource = false;
+                console.log(`✅ Vercel Primary API for episode ${seriesId} S${seasonNumber}E${episodeNumber}: ${episodeUrl}`);
+            } else {
+                console.warn(`⚠️ Vercel API returned empty for episode ${seriesId} S${seasonNumber}E${episodeNumber}`);
             }
-        } catch (error) {
-            console.error("Error fetching HLS JSON:", error);
+        } else {
+            console.warn(`❌ Vercel API returned status ${newApiRes.status} for episode ${seriesId} S${seasonNumber}E${episodeNumber}`);
         }
+    } catch (error) {
+        console.error(`⚠️ Vercel API fetch error for episode ${seriesId} S${seasonNumber}E${episodeNumber}:`, error);
+    }
 
         // -----------------------------------
         // 2️⃣ Fallback to RPM Worker if needed
