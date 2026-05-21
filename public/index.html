@@ -7228,6 +7228,159 @@ padding: 4%;
 
 
 <script>
+	// Save video progress from JJ API player iframe to localStorage
+function saveVideoProgress(uniqueContentId, currentTime, duration) {
+    if (!uniqueContentId) return;
+    if (typeof currentTime !== 'number' || isNaN(currentTime)) return;
+    if (typeof duration !== 'number' || isNaN(duration) || duration <= 0) return;
+    
+    // Get existing progress (handle corrupted data)
+    let videoProgress = {};
+    try {
+        const stored = localStorage.getItem('videoProgress');
+        if (stored && stored !== '0' && stored !== 'null' && stored !== 'undefined') {
+            videoProgress = JSON.parse(stored);
+            // Ensure it's an object
+            if (typeof videoProgress !== 'object' || videoProgress === null) {
+                videoProgress = {};
+            }
+        }
+    } catch(e) {
+        console.error('Error parsing videoProgress:', e);
+        videoProgress = {};
+    }
+    
+    const percentage = Math.floor((currentTime / duration) * 100);
+    
+    videoProgress[uniqueContentId] = {
+        currentTime: currentTime,
+        duration: duration,
+        percentage: percentage,
+        lastUpdated: Date.now()
+    };
+    
+    // Save back to localStorage
+    try {
+        localStorage.setItem('videoProgress', JSON.stringify(videoProgress));
+        console.log(`💾 Progress saved: ${uniqueContentId} - ${percentage}% (${currentTime}/${duration})`);
+    } catch(e) {
+        console.error('Error saving videoProgress:', e);
+    }
+}
+
+// Get saved progress for a content
+function getVideoProgress(uniqueContentId) {
+    try {
+        const stored = localStorage.getItem('videoProgress');
+        if (!stored || stored === '0' || stored === 'null' || stored === 'undefined') {
+            return null;
+        }
+        const videoProgress = JSON.parse(stored);
+        if (typeof videoProgress !== 'object') return null;
+        return videoProgress[uniqueContentId] || null;
+    } catch(e) {
+        console.error('Error getting videoProgress:', e);
+        return null;
+    }
+}
+
+// Clear ALL corrupted videoProgress data and reset
+function resetVideoProgress() {
+    localStorage.setItem('videoProgress', JSON.stringify({}));
+    console.log('🔄 videoProgress reset to empty object');
+}
+
+// Check and fix corrupted videoProgress
+function fixCorruptedVideoProgress() {
+    const stored = localStorage.getItem('videoProgress');
+    if (!stored || stored === '0' || stored === 'null' || stored === 'undefined') {
+        localStorage.setItem('videoProgress', JSON.stringify({}));
+        console.log('✅ Fixed corrupted videoProgress');
+        return true;
+    }
+    try {
+        const parsed = JSON.parse(stored);
+        if (typeof parsed !== 'object' || parsed === null) {
+            localStorage.setItem('videoProgress', JSON.stringify({}));
+            console.log('✅ Fixed non-object videoProgress');
+            return true;
+        }
+    } catch(e) {
+        localStorage.setItem('videoProgress', JSON.stringify({}));
+        console.log('✅ Fixed invalid JSON videoProgress');
+        return true;
+    }
+    return false;
+}
+
+// Call this once on page load to fix any existing corruption
+fixCorruptedVideoProgress();
+
+// Setup progress listener for JJ API player iframe
+function setupJJPlayerProgressListener(uniqueContentId, iframeElement) {
+    if (!iframeElement) return;
+    
+    // First fix any corruption
+    fixCorruptedVideoProgress();
+    
+    const messageHandler = (event) => {
+        const data = event.data;
+        
+        // JJ player time update format
+        if (data && data.type === 'JJ_TIME_UPDATE') {
+            const { currentTime, duration } = data;
+            if (currentTime && duration && typeof currentTime === 'number' && typeof duration === 'number') {
+                saveVideoProgress(uniqueContentId, currentTime, duration);
+            }
+        }
+        
+        // Generic video timeupdate event
+        if (data && data.event === 'timeupdate') {
+            if (typeof data.currentTime === 'number' && typeof data.duration === 'number') {
+                saveVideoProgress(uniqueContentId, data.currentTime, data.duration);
+            }
+        }
+        
+        // Videasy player format
+        if (data && typeof data.currentTime === 'number' && typeof data.duration === 'number') {
+            saveVideoProgress(uniqueContentId, data.currentTime, data.duration);
+        }
+    };
+    
+    window.removeEventListener('message', window._jjProgressHandler);
+    window._jjProgressHandler = messageHandler;
+    window.addEventListener('message', messageHandler);
+    
+    // Also try to inject into iframe if same origin
+    setTimeout(() => {
+        try {
+            const iframeDoc = iframeElement.contentDocument || iframeElement.contentWindow?.document;
+            if (iframeDoc) {
+                const videoElement = iframeDoc.querySelector('video');
+                if (videoElement) {
+                    videoElement.addEventListener('timeupdate', () => {
+                        iframeElement.contentWindow.postMessage({
+                            type: 'JJ_TIME_UPDATE',
+                            currentTime: videoElement.currentTime,
+                            duration: videoElement.duration
+                        }, '*');
+                    });
+                }
+            }
+        } catch(e) {
+            // Cross-origin iframe - rely on postMessage
+        }
+    }, 3000);
+}
+
+// Manual test function - call this to verify it works
+function testSaveProgress() {
+    console.log('Testing saveVideoProgress...');
+    saveVideoProgress('movie_test123', 120, 3600);
+    const saved = getVideoProgress('movie_test123');
+    console.log('Saved data:', saved);
+    console.log('LocalStorage value:', localStorage.getItem('videoProgress'));
+}
 /* search script */
 let currentSearchController = null;
 const imgBase = 'https://image.tmdb.org/t/p/w300';
@@ -11157,7 +11310,7 @@ async function playMovie(item, releaseYear) {
     }
 
     // Open ad in new tab
-    window.open('https://otieu.com/4/9119528', '_blank');
+    
 
     // Save to continue watching and set up progress listener
     saveToContinueWatching(item.id, 'movie', item.poster_path, item.backdrop_path);
