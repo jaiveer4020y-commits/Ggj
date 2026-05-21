@@ -11205,7 +11205,7 @@ async function playMovie(item, releaseYear) {
                     playLink = newApiUrl;
                     source = 'VercelPrimary';
 					// Inside playMovie function, after frame.src = playLink;
-setupProgressListener(`movie_${movieId}`, frame);
+
                     console.log(`✅ Vercel Primary API for movie ID ${movieId}: ${playLink}`);
                 } else {
                     console.warn(`⚠️ Vercel API returned empty for movie ID ${movieId}`);
@@ -11314,9 +11314,23 @@ setupProgressListener(`movie_${movieId}`, frame);
     // Open ad in new tab
     
 
-    // Save to continue watching and set up progress listener
-    saveToContinueWatching(item.id, 'movie', item.poster_path, item.backdrop_path);
-    setupPlayerListener(`movie_${item.id}`);
+    // Save to continue watching
+saveToContinueWatching(
+    item.id,
+    'movie',
+    item.poster_path,
+    item.backdrop_path
+);
+
+// Setup JJ player progress listener
+const movieIframe = document.getElementById('movie-player-iframe');
+
+if (movieIframe) {
+    setupJJPlayerProgressListener(
+        `movie_${item.id}`,
+        movieIframe
+    );
+}
 }
 
 // openModal Script
