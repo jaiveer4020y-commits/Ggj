@@ -3,8 +3,8 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/:slug*",
-      "destination": "/public/index.html"
+      "source": "/(.*)",
+      "destination": "/"
     }
   ]
 }
