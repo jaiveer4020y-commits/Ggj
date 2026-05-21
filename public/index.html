@@ -14085,75 +14085,109 @@ window.addEventListener("popstate", handleRoute);
     submitBtn.disabled = false;
   }
 }
-  </script>
-	<!-- Your existing scripts end here -->
-  
-  <script>
-    // Add this function to close JJ player and restore orientation
-    function closeJJPlayer() {
-        const overlay = document.getElementById('jj-player-overlay');
-        const frame = document.getElementById('jj-player-frame');
-        
-        if (overlay) {
-            overlay.classList.remove('active', 'landscape-active', 'desktop-fullscreen');
-            // Exit fullscreen
-            if (document.fullscreenElement) {
-                document.exitFullscreen().catch(e => console.log(e));
-            }
-            // Restore orientation
-            if (screen.orientation && screen.orientation.unlock) {
-                screen.orientation.unlock();
-            }
-            // Clear iframe
-            if (frame) frame.src = '';
-            overlay.style.display = 'none';
-        }
-        
-        // Restore modal visibility
-        document.getElementById('modal-backdrop-container')?.classList.remove('hidden');
-        const playBtn = document.getElementById('modal-play');
-        if (playBtn) playBtn.style.display = 'flex';
-        
-        // Show home section again
-        document.getElementById('home-section')?.classList.remove('section-hidden');
-        history.back();
-    }
+	<script>
+  // Fixed: Close JJ Player without causing reference errors
+  function closeJJPlayer() {
+      const overlay = document.getElementById('jj-player-overlay');
+      const frame = document.getElementById('jj-player-frame');
+      
+      if (overlay) {
+          overlay.classList.remove('active', 'landscape-active', 'desktop-fullscreen');
+          // Exit fullscreen
+          if (document.fullscreenElement) {
+              document.exitFullscreen().catch(e => console.log(e));
+          }
+          // Restore orientation
+          if (screen.orientation && screen.orientation.unlock) {
+              screen.orientation.unlock();
+          }
+          // Clear iframe
+          if (frame) frame.src = '';
+          overlay.style.display = 'none';
+      }
+      
+      // Restore modal backdrop visibility
+      const backdropContainer = document.getElementById('modal-backdrop-container');
+      if (backdropContainer) {
+          backdropContainer.classList.remove('hidden');
+      }
+      
+      // Show play button again if it exists
+      const playBtn = document.getElementById('modal-play');
+      if (playBtn) {
+          playBtn.style.display = 'flex';
+      }
+      
+      // Show home section
+      const homeSection = document.getElementById('home-section');
+      if (homeSection) {
+          homeSection.classList.remove('section-hidden');
+      }
+      
+      // Clear URL params without triggering full page reload
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('movie') || url.searchParams.has('tv') || url.pathname.includes('/watch/')) {
+          history.back();
+      }
+  }
 
-    // Add close button to JJ overlay
-    document.addEventListener('DOMContentLoaded', () => {
-        // Watch for overlay creation dynamically
-        const observer = new MutationObserver(() => {
-            const existingOverlay = document.getElementById('jj-player-overlay');
-            if (existingOverlay && !existingOverlay.querySelector('.jj-close-btn')) {
-                const closeBtn = document.createElement('button');
-                closeBtn.innerHTML = '✕';
-                closeBtn.className = 'jj-close-btn';
-                closeBtn.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    left: 20px;
-                    z-index: 10002;
-                    background: rgba(0,0,0,0.7);
-                    border: none;
-                    color: white;
-                    font-size: 24px;
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 50%;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    backdrop-filter: blur(5px);
-                `;
-                closeBtn.onclick = closeJJPlayer;
-                existingOverlay.appendChild(closeBtn);
-            }
-        });
-        
-        observer.observe(document.body, { childList: true, subtree: false });
-    });
+  // Add close button to JJ overlay when it's created
+  function addCloseButtonToJJOverlay() {
+      const existingOverlay = document.getElementById('jj-player-overlay');
+      if (existingOverlay && !existingOverlay.querySelector('.jj-close-btn')) {
+          const closeBtn = document.createElement('button');
+          closeBtn.innerHTML = '✕';
+          closeBtn.className = 'jj-close-btn';
+          closeBtn.style.cssText = `
+              position: fixed;
+              top: 20px;
+              left: 20px;
+              z-index: 10002;
+              background: rgba(0,0,0,0.7);
+              border: none;
+              color: white;
+              font-size: 24px;
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              backdrop-filter: blur(5px);
+              font-family: Arial, sans-serif;
+          `;
+          closeBtn.onclick = function(e) {
+              e.stopPropagation();
+              closeJJPlayer();
+          };
+          existingOverlay.appendChild(closeBtn);
+      }
+  }
+
+  // Watch for overlay creation
+  const overlayObserver = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+          if (mutation.type === 'childList') {
+              const overlay = document.getElementById('jj-player-overlay');
+              if (overlay && !overlay.querySelector('.jj-close-btn')) {
+                  addCloseButtonToJJOverlay();
+              }
+          }
+      });
+  });
+  
+  overlayObserver.observe(document.body, { childList: true, subtree: false });
+  
+  // Also check on DOM ready
+  if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', addCloseButtonToJJOverlay);
+  } else {
+      addCloseButtonToJJOverlay();
+  }
+
   </script>
+	
 
 
 
