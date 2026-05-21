@@ -211,7 +211,7 @@ document.addEventListener('click', (event) => {
 	@media (max-width:768px){
   #header-logo-img{
 	height: 40px !important;
-    content: url('/icons/header-logo-mobile.png');
+    content: url('netout.pages.dev/icons/header-logo-mobile.png');
   }
 }
 	.provider-button,#play-provider{
@@ -12757,9 +12757,22 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
        }
 
         modal.scrollTop = 0;
-        saveToContinueWatching(seriesId, 'tv', modal.dataset.posterPath, modal.dataset.backdropPath);
-        setupPlayerListener(playingId);
-        window.open("https://otieu.com/4/9119528", "_blank");
+        saveToContinueWatching(
+    seriesId,
+    'tv',
+    modal.dataset.posterPath,
+    modal.dataset.backdropPath
+);
+
+const episodeIframe = document.getElementById('movie-player-iframe');
+
+if (episodeIframe) {
+    setupJJPlayerProgressListener(
+        playingId,
+        episodeIframe
+    );
+}
+        
     } else {
         playerWrap.innerHTML = `
             <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: white; font-size: 1.2em;">Error: No playable content found.</div>
