@@ -11204,6 +11204,8 @@ async function playMovie(item, releaseYear) {
                 if (responseText && responseText.trim().length > 0) {
                     playLink = newApiUrl;
                     source = 'VercelPrimary';
+					// Inside playMovie function, after frame.src = playLink;
+setupProgressListener(`movie_${movieId}`, frame);
                     console.log(`✅ Vercel Primary API for movie ID ${movieId}: ${playLink}`);
                 } else {
                     console.warn(`⚠️ Vercel API returned empty for movie ID ${movieId}`);
