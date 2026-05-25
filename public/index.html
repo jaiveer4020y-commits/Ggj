@@ -11301,13 +11301,8 @@ async function playMovie(item, releaseYear) {
         if (iframeHolder) {
             iframeHolder.innerHTML = `<iframe ${iframeAttributes}></iframe>${closeButtonDesktop}`;
         } else {
-            console.error('playMovie: iframe-holder not found after link resolution');
-            playerWrap.innerHTML = `
-                <div style="display:flex;justify-content:center;align-items:center;height:100%;color:white;font-size:1.2em;">
-                    Error: Player container not found.
-                </div>
-                <a class="modal-close" onclick="history.back()"></a>
-            `;
+            / Mobile: inject iframe into playerWrap
+        playerWrap.innerHTML = `<iframe ${iframeAttributes}></iframe>${closeButtonMobile}`;
         }
     }
 
