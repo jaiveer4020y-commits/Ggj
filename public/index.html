@@ -12807,10 +12807,11 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
         modal.dataset.currentBackdrop = document.getElementById('modal-backdrop')?.src || '';
 
         openEpisodeModal(
-            episodeUrl, source, seriesName, seriesId,
+            episodeUrl, seriesName, seriesId,
             seasonNumber, episodeNumber, uniqueEpisodeId,
             releaseYear, isGitHubSource
         );
+
 
         modal.scrollTop = 0;
         saveToContinueWatching(seriesId, 'tv', modal.dataset.posterPath, modal.dataset.backdropPath);
@@ -12867,7 +12868,8 @@ function hideGlobalSpinner() {
 
 // ── Episode modal ──────────────────────────────────────────────────────────────
 
-function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource) {
+function openEpisodeModal(episodeUrl, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource) {
+ 
     const existing = document.getElementById('player-modal');
     if (existing) existing.remove();
 
