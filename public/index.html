@@ -12876,30 +12876,53 @@ function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber
         const style = document.createElement('style');
         style.id = styleId;
         style.textContent = `
+            html, body {
+                height: 100% !important;
+                width: 100% !important;
+            }
+            body.player-open {
+                overflow: hidden !important;
+                position: fixed !important;
+                width: 100% !important;
+                height: 100% !important;
+                top: 0 !important;
+                left: 0 !important;
+            }
             #player-modal {
                 position: fixed !important;
-                top: 0 !important; left: 0 !important;
-                width: 100vw !important; height: 100vh !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                width: 100vw !important;
+                height: 100vh !important;
                 background: #000 !important;
                 z-index: 2147483646 !important;
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                margin: 0 !important; padding: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-overflow-scrolling: none !important;
             }
             #player-modal-inner {
                 position: relative !important;
                 width: 100% !important;
                 height: 100% !important;
+                overflow: hidden !important;
             }
             #movie-player-iframe {
                 position: absolute !important;
-                top: 0 !important; left: 0 !important;
-                width: 100% !important; height: 100% !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
                 border: none !important;
                 background: #000 !important;
                 opacity: 0;
-                transition: opacity 0.3s ease;
+                transition: opacity 0.4s ease;
+                -webkit-transform: translateZ(0) !important;
+                transform: translateZ(0) !important;
             }
             #movie-player-iframe.loaded {
                 opacity: 1 !important;
@@ -12915,16 +12938,39 @@ function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber
                 transition: opacity 0.3s ease !important;
             }
             #player-modal-loader img {
-                width: 64px; height: 64px;
-                animation: spin 1s linear infinite;
+                width: 64px !important;
+                height: 64px !important;
+                animation: modal-spin 1s linear infinite !important;
             }
-            @keyframes spin {
+            @keyframes modal-spin {
                 from { transform: rotate(0deg); }
                 to   { transform: rotate(360deg); }
             }
+            #modal-close-btn {
+                position: fixed !important;
+                top: 14px !important;
+                right: 14px !important;
+                z-index: 2147483647 !important;
+                background: rgba(0,0,0,0.75) !important;
+                border: none !important;
+                border-radius: 50% !important;
+                width: 44px !important;
+                height: 44px !important;
+                cursor: pointer !important;
+                color: #fff !important;
+                font-size: 22px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                -webkit-backdrop-filter: blur(6px) !important;
+                backdrop-filter: blur(6px) !important;
+                box-shadow: 0 2px 12px rgba(0,0,0,0.6) !important;
+                -webkit-tap-highlight-color: transparent !important;
+            }
             #player-next-btn {
                 position: fixed !important;
-                bottom: 20px !important; right: 20px !important;
+                bottom: 20px !important;
+                right: 20px !important;
                 z-index: 2147483647 !important;
                 background: rgba(229,9,20,0.9) !important;
                 color: #fff !important;
@@ -12934,51 +12980,37 @@ function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber
                 font-size: 15px !important;
                 font-weight: 600 !important;
                 cursor: pointer !important;
+                -webkit-backdrop-filter: blur(6px) !important;
                 backdrop-filter: blur(6px) !important;
                 box-shadow: 0 2px 12px rgba(0,0,0,0.5) !important;
+                -webkit-tap-highlight-color: transparent !important;
             }
-            #modal-close-btn {
-                position: fixed !important;
-                top: 14px !important; right: 14px !important;
-                z-index: 2147483647 !important;
-                background: rgba(0,0,0,0.75) !important;
-                border: none !important; border-radius: 50% !important;
-                width: 40px !important; height: 40px !important;
-                cursor: pointer !important; color: #fff !important;
-                font-size: 22px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                backdrop-filter: blur(6px) !important;
-                box-shadow: 0 2px 12px rgba(0,0,0,0.5) !important;
-            }
-            body.player-open {
-                overflow: hidden !important;
-                position: fixed !important;
-                width: 100% !important;
-                height: 100% !important;
-                top: 0 !important;
-                left: 0 !important;
-            }
+
+            /* iOS portrait → rotate modal to landscape */
             @media (max-width: 1023px) and (orientation: portrait) {
                 #player-modal {
                     width: 100vh !important;
                     height: 100vw !important;
                     transform: rotate(90deg) !important;
+                    -webkit-transform: rotate(90deg) !important;
                     transform-origin: center center !important;
+                    -webkit-transform-origin: center center !important;
                     top: calc((100vh - 100vw) / 2) !important;
                     left: calc((100vw - 100vh) / 2) !important;
                 }
                 #modal-close-btn {
                     transform: rotate(-90deg) !important;
+                    -webkit-transform: rotate(-90deg) !important;
                 }
                 #player-next-btn {
                     transform: rotate(-90deg) !important;
+                    -webkit-transform: rotate(-90deg) !important;
                     bottom: 14px !important;
                     right: 14px !important;
                 }
                 #player-modal-loader img {
                     transform: rotate(-90deg) !important;
+                    -webkit-transform: rotate(-90deg) !important;
                 }
             }
         `;
@@ -13010,7 +13042,8 @@ function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber
                 allow="autoplay; fullscreen; picture-in-picture; gyroscope; accelerometer"
                 allowfullscreen
                 webkitallowfullscreen
-                mozallowfullscreen>
+                mozallowfullscreen
+                scrolling="no">
             </iframe>
             ${closeBtn}
             ${nextBtn}
@@ -13020,10 +13053,18 @@ function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber
     document.body.appendChild(modal);
     document.body.classList.add('player-open');
 
-    // Hide loader once iframe loads
+    // ── Iframe load handler ────────────────────────────────────────────────────
     const iframe = document.getElementById('movie-player-iframe');
     const loader = document.getElementById('player-modal-loader');
+
+    // Fallback: force show after 5s in case load event never fires (iOS)
+    const loaderFallback = setTimeout(() => {
+        if (iframe) iframe.classList.add('loaded');
+        if (loader) loader.remove();
+    }, 5000);
+
     iframe.addEventListener('load', () => {
+        clearTimeout(loaderFallback);
         iframe.classList.add('loaded');
         if (loader) {
             loader.style.opacity = '0';
@@ -13031,28 +13072,32 @@ function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber
         }
     });
 
-    // Force browser fullscreen
-    const el = document.documentElement;
-    const requestFS =
-        el.requestFullscreen       ||
-        el.webkitRequestFullscreen ||
-        el.mozRequestFullScreen    ||
-        el.msRequestFullscreen;
-    if (requestFS) {
-        requestFS.call(el).catch(err => console.warn('Fullscreen failed:', err));
+    // ── Fullscreen — only attempt on non-iOS, only if allowed ─────────────────
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (!isIOS) {
+        const el = document.documentElement;
+        const requestFS =
+            el.requestFullscreen       ||
+            el.webkitRequestFullscreen ||
+            el.mozRequestFullScreen    ||
+            el.msRequestFullscreen;
+        if (requestFS) {
+            requestFS.call(el).catch(() => {
+                // Silently ignore — modal still works without fullscreen
+            });
+        }
     }
 
-    // Orientation lock (Android / PWA)
-    if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(err =>
-            console.warn('Orientation lock failed:', err)
-        );
+    // ── Orientation lock — Android/PWA only ───────────────────────────────────
+    if (!isIOS && screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
     }
 
-    // Dynamic resize on rotate
+    // ── Resize handler ────────────────────────────────────────────────────────
     function resizeModal() {
+        // Force repaint so CSS media query re-evaluates
         modal.style.display = 'none';
-        modal.offsetHeight;
+        void modal.offsetHeight;
         modal.style.display = 'flex';
     }
     window.addEventListener('resize', resizeModal);
@@ -13071,9 +13116,14 @@ function closePlayerModal() {
     }
 
     document.body.classList.remove('player-open');
-    document.body.style.overflow = '';
-    document.body.style.position = '';
+    document.body.style.overflow  = '';
+    document.body.style.position  = '';
+    document.body.style.width     = '';
+    document.body.style.height    = '';
+    document.body.style.top       = '';
+    document.body.style.left      = '';
 
+    // Exit fullscreen if active
     const exitFS =
         document.exitFullscreen       ||
         document.webkitExitFullscreen ||
@@ -13089,6 +13139,7 @@ function closePlayerModal() {
 
     history.back();
 }
+
 
 
 function closeModal() {
