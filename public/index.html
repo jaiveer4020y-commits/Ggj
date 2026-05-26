@@ -12834,37 +12834,6 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
     }
 }
 
-// ── Global spinner (shows while URLs are resolving, before modal opens) ────────
-
-function showGlobalSpinner() {
-    const existing = document.getElementById('global-player-spinner');
-    if (existing) return;
-    const spinner = document.createElement('div');
-    spinner.id = 'global-player-spinner';
-    spinner.style.cssText = `
-        position:fixed; inset:0; background:#000;
-        z-index:2147483645;
-        display:flex; align-items:center; justify-content:center;
-    `;
-    spinner.innerHTML = `
-        <img
-            src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png"
-            style="width:64px;height:64px;animation:gsp-spin 1s linear infinite;"
-            onerror="this.onerror=null;this.src='https://placehold.co/64x64/000/fff?text=...'">
-        <style>
-            @keyframes gsp-spin {
-                from { transform:rotate(0deg); }
-                to   { transform:rotate(360deg); }
-            }
-        </style>
-    `;
-    document.body.appendChild(spinner);
-}
-
-function hideGlobalSpinner() {
-    const spinner = document.getElementById('global-player-spinner');
-    if (spinner) spinner.remove();
-}
 
 // ── Episode modal ──────────────────────────────────────────────────────────────
 
@@ -12969,24 +12938,7 @@ function openEpisodeModal(episodeUrl, seriesName, seriesId, seasonNumber, episod
                 box-shadow: 0 2px 12px rgba(0,0,0,0.6) !important;
                 -webkit-tap-highlight-color: transparent !important;
             }
-            #player-next-btn {
-                position: fixed !important;
-                bottom: 20px !important;
-                right: 20px !important;
-                z-index: 2147483647 !important;
-                background: rgba(229,9,20,0.9) !important;
-                color: #fff !important;
-                border: none !important;
-                border-radius: 6px !important;
-                padding: 10px 18px !important;
-                font-size: 15px !important;
-                font-weight: 600 !important;
-                cursor: pointer !important;
-                -webkit-backdrop-filter: blur(6px) !important;
-                backdrop-filter: blur(6px) !important;
-                box-shadow: 0 2px 12px rgba(0,0,0,0.5) !important;
-                -webkit-tap-highlight-color: transparent !important;
-            }
+           
 
             /* iOS portrait → rotate modal to landscape */
             @media (max-width: 1023px) and (orientation: portrait) {
