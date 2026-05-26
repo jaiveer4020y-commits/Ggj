@@ -11287,46 +11287,70 @@ async function playMovie(item, releaseYear) {
         }
     }
 
-    const iframeAttributes = `id="movie-player-iframe" src="${playLink}" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen" allowfullscreen style="aspect-ratio: 16/9;"`;
-
-    const closeButtonMobile  = source !== 'github' ? `<a class="player-close" onclick="history.back()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" role="img" viewBox="0 0 24 24" width="24" height="24"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5858 12L2.29291 3.70706L3.70712 2.29285L12 10.5857L20.2929 2.29285L21.7071 3.70706L13.4142 12L21.7071 20.2928L20.2929 21.7071L12 13.4142L3.70712 21.7071L2.29291 20.2928L10.5858 12Z" fill="currentColor"></path></svg></a>` : '';
-    const closeButtonDesktop = source !== 'github' ? `<a class="player-close" onclick="playerClose()"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="#FFFFFF" fill-rule="evenodd" d="M6.414 11H21v2H6.414l5.293 5.293-1.414 1.414-7-7a1 1 0 0 1 0-1.414l7-7 1.414 1.414z"></path></svg></a>` : '';
-
-    if (!isDesktop) {
-        // Mobile: inject iframe into playerWrap
-        playerWrap.innerHTML = `<iframe ${iframeAttributes}></iframe>${closeButtonMobile}`;
-    } else {
-        // Desktop: inject iframe into iframe-holder
-        const iframeHolder = document.getElementById('iframe-holder');
-        if (iframeHolder) {
-            iframeHolder.innerHTML = `<iframe ${iframeAttributes}></iframe>${closeButtonDesktop}`;
-        } else {
-            / Mobile: inject iframe into playerWrap
-        playerWrap.innerHTML = `<iframe ${iframeAttributes}></iframe>${closeButtonMobile}`;
-        }
-    }
-
-    // Open ad in new tab
-    
+    // ── Open fullscreen modal ──────────────────────────────────────────────────
+    openPlayerModal(playLink, source);
 
     // Save to continue watching
-saveToContinueWatching(
-    item.id,
-    'movie',
-    item.poster_path,
-    item.backdrop_path
-);
+    saveToContinueWatching(item.id, 'movie', item.poster_path, item.backdrop_path);
 
-// Setup JJ player progress listener
-const movieIframe = document.getElementById('movie-player-iframe');
+    // Setup JJ player progress listener
+    const movieIframe = document.getElementById('movie-player-iframe');
+    if (movieIframe) {
+        setupJJPlayerProgressListener(`movie_${item.id}`, movieIframe);
+    }
+}
 
-if (movieIframe) {
-    setupJJPlayerProgressListener(
-        `movie_${item.id}`,
-        movieIframe
-    );
+// ── Modal helpers (place these outside playMovie) ──────────────────────────────
+
+function openPlayerModal(playLink, source) {
+    const existing = document.getElementById('player-modal');
+    if (existing) existing.remove();
+
+    const closeAction = `closePlayerModal()`;
+    const showClose   = source !== 'github';
+
+    const closeBtn = showClose ? `
+        <button onclick="${closeAction}" style="
+            position:absolute; top:14px; right:14px; z-index:100000;
+            background:rgba(0,0,0,0.65); border:none; border-radius:50%;
+            width:38px; height:38px; cursor:pointer; color:#fff; font-size:20px;
+            display:flex; align-items:center; justify-content:center;
+            backdrop-filter:blur(4px);">✕</button>` : '';
+
+    const modal = document.createElement('div');
+    modal.id = 'player-modal';
+    modal.style.cssText = `
+        position:fixed; inset:0; width:100vw; height:100vh;
+        background:#000; z-index:99999;
+        display:flex; align-items:center; justify-content:center;
+    `;
+
+    modal.innerHTML = `
+        <div style="position:relative; width:100%; height:100%;">
+            <iframe
+                id="movie-player-iframe"
+                src="${playLink}"
+                width="100%" height="100%"
+                frameborder="0"
+                allow="autoplay; fullscreen"
+                allowfullscreen
+                style="width:100%; height:100%; border:none; display:block;">
+            </iframe>
+            ${closeBtn}
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
 }
+
+function closePlayerModal() {
+    const modal = document.getElementById('player-modal');
+    if (modal) modal.remove();
+    document.body.style.overflow = '';
+    history.back();
 }
+
 
 // openModal Script
 async function openModal(id, mediaType) {
