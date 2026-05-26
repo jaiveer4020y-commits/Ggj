@@ -12847,104 +12847,233 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
             iframeAttributes = `id="movie-player-iframe" src="${episodeUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen" allowfullscreen style="aspect-ratio: 16/9;"`;
         }
 
-        if (!isDesktop) {
-         // Mobile → put iframe inside playerWrap
-         let mobileHTML = `
-           <iframe ${iframeAttributes}></iframe>
-         `;
-         
-         // Only add close button if NOT GitHub source
-         if (!isGitHubSource) {
-             mobileHTML += `
-               <a class="player-close" onclick="history.back()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" role="img" viewBox="0 0 24 24" width="24" height="24" data-icon="XStandard" aria-hidden="true">
-<path fill-rule="evenodd" clip-rule="evenodd" d="M10.5858 12L2.29291 3.70706L3.70712 2.29285L12 10.5857L20.2929 2.29285L21.7071 3.70706L13.4142 12L21.7071 20.2928L20.2929 21.7071L12 13.4142L3.70712 21.7071L2.29291 20.2928L10.5858 12Z" fill="currentColor"></path>
+            // ── Open fullscreen modal (mobile + desktop unified) ──────────────────────
+    openEpisodeModal(playLink, source, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource);
 
-</svg></a>
-             `;
-         }
-         
-         playerWrap.innerHTML = mobileHTML;
-       } else {
-         // Desktop → put iframe inside iframe-holder
-         const iframeHolder = document.getElementById("iframe-holder");
-         if (iframeHolder) {
-           let desktopHTML = `
-             <iframe ${iframeAttributes}></iframe>
-           `;
-           
-           // Only add close button if NOT GitHub source
-           if (!isGitHubSource) {
-               desktopHTML += `
-                 <a class="player-close" onclick="playerClose()"><svg xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="30" height="30" data-icon="ArrowLeftMedium" data-icon-id=":r0:" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" role="img"><path fill="#FFFFFF" fill-rule="evenodd" d="M6.414 11H21v2H6.414l5.293 5.293-1.414 1.414-7-7a1 1 0 0 1 0-1.414l7-7 1.414 1.414z" clip-rule="evenodd"></path></svg></a>
-               `;
-           }
-           
-           desktopHTML += `
-             <button id="next-button" class="next-button" onclick="playEpisode('${seriesName}', ${seasonNumber}, ${episodeNumber + 1}, '${seriesId}', '${uniqueEpisodeId}', '${releaseYear}')">
-             ▶ Next Episode
-             </button>
-           `;
-           
-           iframeHolder.innerHTML = desktopHTML;
-         } else {
-          console.error("iframe-holder element not found in the DOM");
-           playerWrap.innerHTML = `
-             <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: white; font-size: 1.2em;">
-               Error: Player container not found.
-             </div>
-             <a class="modal-close" onclick="playerClose()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" role="img" viewBox="0 0 24 24" width="24" height="24" data-icon="XStandard" aria-hidden="true">
-<path fill-rule="evenodd" clip-rule="evenodd" d="M10.5858 12L2.29291 3.70706L3.70712 2.29285L12 10.5857L20.2929 2.29285L21.7071 3.70706L13.4142 12L21.7071 20.2928L20.2929 21.7071L12 13.4142L3.70712 21.7071L2.29291 20.2928L10.5858 12Z" fill="currentColor"></path>
+    modal.scrollTop = 0;
+    saveToContinueWatching(seriesId, 'tv', modal.dataset.posterPath, modal.dataset.backdropPath);
 
-</svg></a>
-           `;
-         }
-       }
+    const episodeIframe = document.getElementById('movie-player-iframe');
+    if (episodeIframe) {
+        setupJJPlayerProgressListener(playingId, episodeIframe);
+    }
 
-        modal.scrollTop = 0;
-        saveToContinueWatching(
-    seriesId,
-    'tv',
-    modal.dataset.posterPath,
-    modal.dataset.backdropPath
-);
-
-const episodeIframe = document.getElementById('movie-player-iframe');
-
-if (episodeIframe) {
-    setupJJPlayerProgressListener(
-        playingId,
-        episodeIframe
-    );
-}
-        
     } else {
         playerWrap.innerHTML = `
-            <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: white; font-size: 1.2em;">Error: No playable content found.</div>
-            <a class="modal-close" onclick="history.back)"></a>
+            <div style="display:flex;justify-content:center;align-items:center;height:100%;color:white;font-size:1.2em;">Error: No playable content found.</div>
+            <a class="modal-close" onclick="history.back()"></a>
         `;
         console.error(`No play URL found for TV episode TMDB ID ${seriesId} S${seasonNumber}E${episodeNumber}.`);
     }
 }
+
+// ── Place these functions outside playEpisode ──────────────────────────────────
+
+function openEpisodeModal(playLink, source, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource) {
+    const existing = document.getElementById('player-modal');
+    if (existing) existing.remove();
+
+    // Force inject CSS
+    const styleId = 'player-modal-style';
+    if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            #player-modal {
+                position: fixed !important;
+                top: 0 !important; left: 0 !important;
+                width: 100vw !important; height: 100vh !important;
+                background: #000 !important;
+                z-index: 2147483646 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 0 !important; padding: 0 !important;
+            }
+            #player-modal-inner {
+                position: relative !important;
+                width: 100% !important;
+                height: 100% !important;
+            }
+            #movie-player-iframe {
+                position: absolute !important;
+                top: 0 !important; left: 0 !important;
+                width: 100% !important; height: 100% !important;
+                border: none !important;
+                background: #000 !important;
+            }
+            #player-next-btn {
+                position: fixed !important;
+                bottom: 20px !important; right: 20px !important;
+                z-index: 2147483647 !important;
+                background: rgba(229,9,20,0.9) !important;
+                color: #fff !important;
+                border: none !important;
+                border-radius: 6px !important;
+                padding: 10px 18px !important;
+                font-size: 15px !important;
+                font-weight: 600 !important;
+                cursor: pointer !important;
+                backdrop-filter: blur(6px) !important;
+                box-shadow: 0 2px 12px rgba(0,0,0,0.5) !important;
+            }
+            #modal-close-btn {
+                position: fixed !important;
+                top: 14px !important; right: 14px !important;
+                z-index: 2147483647 !important;
+                background: rgba(0,0,0,0.75) !important;
+                border: none !important; border-radius: 50% !important;
+                width: 40px !important; height: 40px !important;
+                cursor: pointer !important; color: #fff !important;
+                font-size: 22px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                backdrop-filter: blur(6px) !important;
+                box-shadow: 0 2px 12px rgba(0,0,0,0.5) !important;
+            }
+            body.player-open {
+                overflow: hidden !important;
+                position: fixed !important;
+                width: 100% !important;
+                height: 100% !important;
+                top: 0 !important;
+                left: 0 !important;
+            }
+            @media (max-width: 1023px) and (orientation: portrait) {
+                #player-modal {
+                    width: 100vh !important;
+                    height: 100vw !important;
+                    transform: rotate(90deg) !important;
+                    transform-origin: center center !important;
+                    top: calc((100vh - 100vw) / 2) !important;
+                    left: calc((100vw - 100vh) / 2) !important;
+                }
+                #modal-close-btn {
+                    transform: rotate(-90deg) !important;
+                }
+                #player-next-btn {
+                    transform: rotate(-90deg) !important;
+                    bottom: 14px !important;
+                    right: 14px !important;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const closeBtn = !isGitHubSource ? `
+        <button id="modal-close-btn" onclick="closePlayerModal()">✕</button>` : '';
+
+    const nextBtn = `
+        <button id="player-next-btn" onclick="
+            closePlayerModal();
+            playEpisode('${seriesName}', ${seasonNumber}, ${episodeNumber + 1}, '${seriesId}', '${uniqueEpisodeId}', '${releaseYear}');
+        ">▶ Next Episode</button>`;
+
+    const modal = document.createElement('div');
+    modal.id = 'player-modal';
+    modal.innerHTML = `
+        <div id="player-modal-inner">
+            <iframe
+                id="movie-player-iframe"
+                src="${playLink}"
+                frameborder="0"
+                allow="autoplay; fullscreen; picture-in-picture; gyroscope; accelerometer"
+                allowfullscreen
+                webkitallowfullscreen
+                mozallowfullscreen>
+            </iframe>
+            ${closeBtn}
+            ${nextBtn}
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.classList.add('player-open');
+
+    // Force browser fullscreen
+    const el = document.documentElement;
+    const requestFS =
+        el.requestFullscreen       ||
+        el.webkitRequestFullscreen ||
+        el.mozRequestFullScreen    ||
+        el.msRequestFullscreen;
+    if (requestFS) {
+        requestFS.call(el).catch(err => console.warn('Fullscreen failed:', err));
+    }
+
+    // Orientation lock (Android / PWA)
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(err =>
+            console.warn('Orientation lock failed:', err)
+        );
+    }
+
+    // Dynamic resize on rotate
+    function resizeModal() {
+        modal.style.display = 'none';
+        modal.offsetHeight; // force reflow
+        modal.style.display = 'flex';
+    }
+    window.addEventListener('resize', resizeModal);
+    window.addEventListener('orientationchange', resizeModal);
+    modal._resizeModal = resizeModal;
+}
+
+function closePlayerModal() {
+    const modal = document.getElementById('player-modal');
+    if (modal) {
+        if (modal._resizeModal) {
+            window.removeEventListener('resize', modal._resizeModal);
+            window.removeEventListener('orientationchange', modal._resizeModal);
+        }
+        modal.remove();
+    }
+
+    document.body.classList.remove('player-open');
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+
+    // Exit fullscreen
+    const exitFS =
+        document.exitFullscreen       ||
+        document.webkitExitFullscreen ||
+        document.mozCancelFullScreen  ||
+        document.msExitFullscreen;
+    if (exitFS && document.fullscreenElement) {
+        exitFS.call(document).catch(() => {});
+    }
+
+    // Release orientation lock
+    if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+    }
+
+    history.back();
+}
+
 function closeModal() {
     if (window.progressInterval) {
         clearInterval(window.progressInterval);
         window.progressInterval = null;
     }
-  
+
     if (player) {
-                try {
-                    player.stopVideo();
-                    player.destroy();
-                } catch (e) {
-                    console.log('Error destroying player:', e);
-                }
-                player = null;
-            }
-  
+        try {
+            player.stopVideo();
+            player.destroy();
+        } catch (e) {
+            console.log('Error destroying player:', e);
+        }
+        player = null;
+    }
+
     if (window.currentMessageHandler) {
         window.removeEventListener('message', window.currentMessageHandler);
         window.currentMessageHandler = null;
     }
+
   
     const modal = document.getElementById('tmdb-modal');
     const playerWrap = document.getElementById('playerWrap');
