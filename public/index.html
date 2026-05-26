@@ -12841,22 +12841,17 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
 
     if (episodeUrl) {
         modal.dataset.currentBackdrop = document.getElementById('modal-backdrop')?.src || '';
-        let iframeAttributes = `id="movie-player-iframe" src="${episodeUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen" allowfullscreen style="aspect-ratio: 16/9;"`;
 
-        if (isHlsWorkerLink) {
-            iframeAttributes = `id="movie-player-iframe" src="${episodeUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen" allowfullscreen style="aspect-ratio: 16/9;"`;
+        // ── Open fullscreen modal ──────────────────────────────────────────────
+        openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource);
+
+        modal.scrollTop = 0;
+        saveToContinueWatching(seriesId, 'tv', modal.dataset.posterPath, modal.dataset.backdropPath);
+
+        const episodeIframe = document.getElementById('movie-player-iframe');
+        if (episodeIframe) {
+            setupJJPlayerProgressListener(playingId, episodeIframe);
         }
-
-            // ── Open fullscreen modal (mobile + desktop unified) ──────────────────────
-    openEpisodeModal(playLink, source, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource);
-
-    modal.scrollTop = 0;
-    saveToContinueWatching(seriesId, 'tv', modal.dataset.posterPath, modal.dataset.backdropPath);
-
-    const episodeIframe = document.getElementById('movie-player-iframe');
-    if (episodeIframe) {
-        setupJJPlayerProgressListener(playingId, episodeIframe);
-    }
 
     } else {
         playerWrap.innerHTML = `
@@ -12869,7 +12864,7 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
 
 // ── Place these functions outside playEpisode ──────────────────────────────────
 
-function openEpisodeModal(playLink, source, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource) {
+function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource) {
     const existing = document.getElementById('player-modal');
     if (existing) existing.remove();
 
@@ -12901,6 +12896,29 @@ function openEpisodeModal(playLink, source, seriesName, seriesId, seasonNumber, 
                 width: 100% !important; height: 100% !important;
                 border: none !important;
                 background: #000 !important;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            #movie-player-iframe.loaded {
+                opacity: 1 !important;
+            }
+            #player-modal-loader {
+                position: absolute !important;
+                inset: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                background: #000 !important;
+                z-index: 10 !important;
+                transition: opacity 0.3s ease !important;
+            }
+            #player-modal-loader img {
+                width: 64px; height: 64px;
+                animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to   { transform: rotate(360deg); }
             }
             #player-next-btn {
                 position: fixed !important;
@@ -12957,6 +12975,9 @@ function openEpisodeModal(playLink, source, seriesName, seriesId, seasonNumber, 
                     bottom: 14px !important;
                     right: 14px !important;
                 }
+                #player-modal-loader img {
+                    transform: rotate(-90deg) !important;
+                }
             }
         `;
         document.head.appendChild(style);
@@ -12975,15 +12996,23 @@ function openEpisodeModal(playLink, source, seriesName, seriesId, seasonNumber, 
     modal.id = 'player-modal';
     modal.innerHTML = `
         <div id="player-modal-inner">
+
+            <div id="player-modal-loader">
+                <img
+                    src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png"
+                    onerror="this.onerror=null; this.src='https://placehold.co/64x64/000/fff?text=...'">
+            </div>
+
             <iframe
                 id="movie-player-iframe"
-                src="${playLink}"
+                src="${episodeUrl}"
                 frameborder="0"
                 allow="autoplay; fullscreen; picture-in-picture; gyroscope; accelerometer"
                 allowfullscreen
                 webkitallowfullscreen
                 mozallowfullscreen>
             </iframe>
+
             ${closeBtn}
             ${nextBtn}
         </div>
@@ -12991,6 +13020,17 @@ function openEpisodeModal(playLink, source, seriesName, seriesId, seasonNumber, 
 
     document.body.appendChild(modal);
     document.body.classList.add('player-open');
+
+    // Hide loader once iframe loads
+    const iframe = document.getElementById('movie-player-iframe');
+    const loader = document.getElementById('player-modal-loader');
+    iframe.addEventListener('load', () => {
+        iframe.classList.add('loaded');
+        if (loader) {
+            loader.style.opacity = '0';
+            setTimeout(() => loader.remove(), 300);
+        }
+    });
 
     // Force browser fullscreen
     const el = document.documentElement;
@@ -13052,6 +13092,7 @@ function closePlayerModal() {
 
     history.back();
 }
+
 
 function closeModal() {
     if (window.progressInterval) {
