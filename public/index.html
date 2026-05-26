@@ -12693,102 +12693,68 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
         container.classList.remove("hidden");
     }
     
-    if (!isDesktop) {
-      // Mobile
-      if (playBtn) {
-         playBtn.style.display = "none";
-         }
-      playerWrap.innerHTML = `
-        <div class="loading-spinner-container">
-          <img
-            src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png"
-            alt="Loading..."
-            onerror="this.onerror=null; this.src='https://placehold.co/64x64/cccccc/333333?text=Loading';">
-        </div>
-        <a class="player-close" onclick="history.back()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" role="img" viewBox="0 0 24 24" width="24" height="24" data-icon="XStandard" aria-hidden="true">
-<path fill-rule="evenodd" clip-rule="evenodd" d="M10.5858 12L2.29291 3.70706L3.70712 2.29285L12 10.5857L20.2929 2.29285L21.7071 3.70706L13.4142 12L21.7071 20.2928L20.2929 21.7071L12 13.4142L3.70712 21.7071L2.29291 20.2928L10.5858 12Z" fill="currentColor"></path>
+        // ── Show global spinner while resolving URL ────────────────────────────────
+    showGlobalSpinner();
 
-</svg></a>
-      `;
-    } else {
-      // Desktop
-      iframeHolder.style.display = "block";
-      iframeHolder.innerHTML = `
-        <div class="loading-spinner-container">
-          <img
-            src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png"
-            alt="Loading..."
-            onerror="this.onerror=null; this.src='https://placehold.co/64x64/cccccc/333333?text=Loading';">
-        </div>
-        <a class="player-close" onclick="playerClose()"><svg xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="24" height="24" data-icon="ArrowLeftMedium" data-icon-id=":r0:" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" role="img"><path fill="#FFFFFF" fill-rule="evenodd" d="M6.414 11H21v2H6.414l5.293 5.293-1.414 1.414-7-7a1 1 0 0 1 0-1.414l7-7 1.414 1.414z" clip-rule="evenodd"></path></svg></a>
-      `;
-    }
-
-    let episodeUrl = null;
+    let episodeUrl      = null;
     let isHlsWorkerLink = false;
-    let isGitHubSource = false; // Flag to track GitHub source
+    let isGitHubSource  = false;
 
-    const formattedSeason = seasonNumber < 10 ? `s0${seasonNumber}` : `s${seasonNumber}`;
+    const formattedSeason  = seasonNumber  < 10 ? `s0${seasonNumber}`  : `s${seasonNumber}`;
     const formattedEpisode = episodeNumber < 10 ? `e0${episodeNumber}` : `e${episodeNumber}`;
 
     if (seriesName && seasonNumber !== undefined && episodeNumber !== undefined) {
         const formattedSeriesTitle = formatTitleForHls(seriesName);
         const dottedTitle = `${formattedSeriesTitle}.${formattedSeason}${formattedEpisode}`;
 
-          // 1️⃣ NEW PRIMARY API: https://jj-seven-gray.vercel.app/tv/{seriesId}/S{seasonNumber}/E{episodeNumber}
-    try {
-        const newApiUrl = `https://jj-seven-gray.vercel.app/tv/${seriesId}/S${seasonNumber}/E${episodeNumber}`;
-        const newApiRes = await fetch(newApiUrl);
-        if (newApiRes.ok) {
-            const responseText = await newApiRes.text();
-            if (responseText && responseText.trim().length > 0) {
-                episodeUrl = newApiUrl;
-                isHlsWorkerLink = true;
-                isGitHubSource = false;
-                console.log(`✅ Vercel Primary API for episode ${seriesId} S${seasonNumber}E${episodeNumber}: ${episodeUrl}`);
+        // 1️⃣ Vercel Primary API
+        try {
+            const newApiUrl = `https://jj-seven-gray.vercel.app/tv/${seriesId}/S${seasonNumber}/E${episodeNumber}`;
+            const newApiRes = await fetch(newApiUrl);
+            if (newApiRes.ok) {
+                const responseText = await newApiRes.text();
+                if (responseText && responseText.trim().length > 0) {
+                    episodeUrl      = newApiUrl;
+                    isHlsWorkerLink = true;
+                    isGitHubSource  = false;
+                    console.log(`✅ Vercel Primary API: ${episodeUrl}`);
+                } else {
+                    console.warn(`⚠️ Vercel API returned empty for S${seasonNumber}E${episodeNumber}`);
+                }
             } else {
-                console.warn(`⚠️ Vercel API returned empty for episode ${seriesId} S${seasonNumber}E${episodeNumber}`);
+                console.warn(`❌ Vercel API status ${newApiRes.status}`);
             }
-        } else {
-            console.warn(`❌ Vercel API returned status ${newApiRes.status} for episode ${seriesId} S${seasonNumber}E${episodeNumber}`);
+        } catch (error) {
+            console.error(`⚠️ Vercel API fetch error:`, error);
         }
-    } catch (error) {
-        console.error(`⚠️ Vercel API fetch error for episode ${seriesId} S${seasonNumber}E${episodeNumber}:`, error);
-    }
 
-        // -----------------------------------
-        // 2️⃣ Fallback to RPM Worker if needed
-        // -----------------------------------
+        // 2️⃣ RPM Worker fallback
         if (!episodeUrl) {
             const rpmWorkerApiUrl = `${RPM_WORKER_BASE_URL}?title=${encodeURIComponent(dottedTitle)}`;
             try {
-                const rpmRes = await fetch(rpmWorkerApiUrl);
+                const rpmRes  = await fetch(rpmWorkerApiUrl);
                 const rpmData = await rpmRes.json();
                 if (rpmData?.result?.files?.length > 0) {
-                   const expectedStart = dottedTitle.toLowerCase();
-                   const matchedFile = rpmData.result.files.find(file =>
-                       file.title?.toLowerCase().startsWith(expectedStart)
-                   );
-
+                    const expectedStart = dottedTitle.toLowerCase();
+                    const matchedFile   = rpmData.result.files.find(f =>
+                        f.title?.toLowerCase().startsWith(expectedStart)
+                    );
                     if (matchedFile?.file_code) {
-                       const fileCode = matchedFile.file_code;
-                       const playerBaseUrl = await getRegionBasedPlayerBaseUrl();
-                       episodeUrl = `${playerBaseUrl}/#${fileCode}&api=all`;
-                       isHlsWorkerLink = false;
-                       isGitHubSource = false; // Explicitly mark as non-GitHub
-                       console.log(`✅ RPM startsWith match: ${matchedFile.title}`);
+                        const playerBaseUrl = await getRegionBasedPlayerBaseUrl();
+                        episodeUrl      = `${playerBaseUrl}/#${matchedFile.file_code}&api=all`;
+                        isHlsWorkerLink = false;
+                        isGitHubSource  = false;
+                        console.log(`✅ RPM match: ${matchedFile.title}`);
                     } else {
-                         console.warn(`⚠ No RPM file starting with "${dottedTitle}"`);
+                        console.warn(`⚠️ No RPM file starting with "${dottedTitle}"`);
                     }
                 }
             } catch (error) {
-                console.error(`Error fetching HLS for "${seriesName} ${formattedSeason}${formattedEpisode}":`, error);
+                console.error(`⚠️ RPM Worker error:`, error);
             }
         }
 
-        // -----------------------------------
-        // 3️⃣ Fallback to Page API if needed
-        // -----------------------------------
+        // 3️⃣ Page API fallback
         if (!episodeUrl) {
             const pageApiUrl = `/api/rpm?search=${encodeURIComponent(dottedTitle)}`;
             try {
@@ -12796,54 +12762,55 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
                 if (!pageRes.ok) throw new Error(`Page API error: ${pageRes.status}`);
                 const pageData = await pageRes.json();
                 if (pageData?.data?.length > 0) {
-                    const fileCode      = pageData.data[0].id;
                     const playerBaseUrl = await getRegionBasedPlayerBaseUrl();
-                    episodeUrl    = `${playerBaseUrl}/#${fileCode}&api=all`;
+                    episodeUrl      = `${playerBaseUrl}/#${pageData.data[0].id}&api=all`;
                     isHlsWorkerLink = false;
                     isGitHubSource  = false;
-                    console.log(`✅ Page API match for "${seriesName} ${formattedSeason}${formattedEpisode}": ${episodeUrl}`);
+                    console.log(`✅ Page API match: ${episodeUrl}`);
                 } else {
                     console.warn(`⚠️ No Page API results for "${dottedTitle}"`);
                 }
             } catch (error) {
-                console.error(`⚠️ Page API error for "${seriesName} ${formattedSeason}${formattedEpisode}" (${error.message}), trying Youout mirror...`);
-                // Mirror fallback: Youout API (same response format as Page API)
+                console.error(`⚠️ Page API error, trying Youout mirror...`, error);
                 try {
                     const yououtApiUrl = `https://youout.vercel.app/api/videos?search=${encodeURIComponent(dottedTitle)}`;
                     const yououtRes    = await fetch(yououtApiUrl);
                     const yououtData   = await yououtRes.json();
                     if (yououtData?.data?.length > 0) {
-                        const fileCode      = yououtData.data[0].id;
                         const playerBaseUrl = await getRegionBasedPlayerBaseUrl();
-                        episodeUrl      = `${playerBaseUrl}/#${fileCode}&api=all`;
+                        episodeUrl      = `${playerBaseUrl}/#${yououtData.data[0].id}&api=all`;
                         isHlsWorkerLink = false;
                         isGitHubSource  = false;
-                        console.log(`✅ Youout mirror match for "${seriesName} ${formattedSeason}${formattedEpisode}": ${episodeUrl}`);
+                        console.log(`✅ Youout mirror match: ${episodeUrl}`);
                     } else {
-                        console.warn(`⚠️ No Youout mirror results for "${dottedTitle}"`);
+                        console.warn(`⚠️ No Youout results for "${dottedTitle}"`);
                     }
                 } catch (yououtErr) {
-                    console.error(`⚠️ Youout mirror fetch error for "${seriesName} ${formattedSeason}${formattedEpisode}":`, yououtErr);
+                    console.error(`⚠️ Youout mirror error:`, yououtErr);
                 }
             }
         }
     }
 
-    // -------------------------------------
-    // 4️⃣ Final Fallback: Videasy (if needed)
-    // -------------------------------------
+    // 4️⃣ Final fallback: Videasy
     if (!episodeUrl && seriesId !== undefined) {
-        episodeUrl = `https://player.videasy.net/tv/${seriesId}/${seasonNumber}/${episodeNumber}`;
+        episodeUrl      = `https://player.videasy.net/tv/${seriesId}/${seasonNumber}/${episodeNumber}`;
         isHlsWorkerLink = true;
-        isGitHubSource = false; // Videasy is not GitHub
-        console.log(`⚠️ Using fallback Videasy link for TMDB ID ${seriesId} S${seasonNumber}E${episodeNumber}: ${episodeUrl}`);
+        isGitHubSource  = false;
+        console.log(`⚠️ Videasy fallback: ${episodeUrl}`);
     }
+
+    // ── Hide global spinner ────────────────────────────────────────────────────
+    hideGlobalSpinner();
 
     if (episodeUrl) {
         modal.dataset.currentBackdrop = document.getElementById('modal-backdrop')?.src || '';
 
-        // ── Open fullscreen modal ──────────────────────────────────────────────
-        openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource);
+        openEpisodeModal(
+            episodeUrl, source, seriesName, seriesId,
+            seasonNumber, episodeNumber, uniqueEpisodeId,
+            releaseYear, isGitHubSource
+        );
 
         modal.scrollTop = 0;
         saveToContinueWatching(seriesId, 'tv', modal.dataset.posterPath, modal.dataset.backdropPath);
@@ -12854,21 +12821,56 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
         }
 
     } else {
+        hideGlobalSpinner();
         playerWrap.innerHTML = `
-            <div style="display:flex;justify-content:center;align-items:center;height:100%;color:white;font-size:1.2em;">Error: No playable content found.</div>
+            <div style="display:flex;justify-content:center;align-items:center;
+                height:100%;color:white;font-size:1.2em;">
+                Error: No playable content found.
+            </div>
             <a class="modal-close" onclick="history.back()"></a>
         `;
-        console.error(`No play URL found for TV episode TMDB ID ${seriesId} S${seasonNumber}E${episodeNumber}.`);
+        console.error(`No play URL found for TMDB ID ${seriesId} S${seasonNumber}E${episodeNumber}.`);
     }
 }
 
-// ── Place these functions outside playEpisode ──────────────────────────────────
+// ── Global spinner (shows while URLs are resolving, before modal opens) ────────
+
+function showGlobalSpinner() {
+    const existing = document.getElementById('global-player-spinner');
+    if (existing) return;
+    const spinner = document.createElement('div');
+    spinner.id = 'global-player-spinner';
+    spinner.style.cssText = `
+        position:fixed; inset:0; background:#000;
+        z-index:2147483645;
+        display:flex; align-items:center; justify-content:center;
+    `;
+    spinner.innerHTML = `
+        <img
+            src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png"
+            style="width:64px;height:64px;animation:gsp-spin 1s linear infinite;"
+            onerror="this.onerror=null;this.src='https://placehold.co/64x64/000/fff?text=...'">
+        <style>
+            @keyframes gsp-spin {
+                from { transform:rotate(0deg); }
+                to   { transform:rotate(360deg); }
+            }
+        </style>
+    `;
+    document.body.appendChild(spinner);
+}
+
+function hideGlobalSpinner() {
+    const spinner = document.getElementById('global-player-spinner');
+    if (spinner) spinner.remove();
+}
+
+// ── Episode modal ──────────────────────────────────────────────────────────────
 
 function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber, episodeNumber, uniqueEpisodeId, releaseYear, isGitHubSource) {
     const existing = document.getElementById('player-modal');
     if (existing) existing.remove();
 
-    // Force inject CSS
     const styleId = 'player-modal-style';
     if (!document.getElementById(styleId)) {
         const style = document.createElement('style');
@@ -12996,13 +12998,11 @@ function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber
     modal.id = 'player-modal';
     modal.innerHTML = `
         <div id="player-modal-inner">
-
             <div id="player-modal-loader">
                 <img
                     src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png"
-                    onerror="this.onerror=null; this.src='https://placehold.co/64x64/000/fff?text=...'">
+                    onerror="this.onerror=null;this.src='https://placehold.co/64x64/000/fff?text=...'">
             </div>
-
             <iframe
                 id="movie-player-iframe"
                 src="${episodeUrl}"
@@ -13012,7 +13012,6 @@ function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber
                 webkitallowfullscreen
                 mozallowfullscreen>
             </iframe>
-
             ${closeBtn}
             ${nextBtn}
         </div>
@@ -13053,7 +13052,7 @@ function openEpisodeModal(episodeUrl, source, seriesName, seriesId, seasonNumber
     // Dynamic resize on rotate
     function resizeModal() {
         modal.style.display = 'none';
-        modal.offsetHeight; // force reflow
+        modal.offsetHeight;
         modal.style.display = 'flex';
     }
     window.addEventListener('resize', resizeModal);
@@ -13075,7 +13074,6 @@ function closePlayerModal() {
     document.body.style.overflow = '';
     document.body.style.position = '';
 
-    // Exit fullscreen
     const exitFS =
         document.exitFullscreen       ||
         document.webkitExitFullscreen ||
@@ -13085,7 +13083,6 @@ function closePlayerModal() {
         exitFS.call(document).catch(() => {});
     }
 
-    // Release orientation lock
     if (screen.orientation && screen.orientation.unlock) {
         screen.orientation.unlock();
     }
