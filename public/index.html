@@ -10917,6 +10917,17 @@ async function playMovie(item, releaseYear) {
     const modal      = document.getElementById('tmdb-modal');
     const playerWrap = document.getElementById('playerWrap');
     const playBtn    = document.getElementById('modal-play');
+    const isDesktop  = window.innerWidth >= 1024;
+
+    const spinnerHTML = `
+        <div class="loading-spinner-container">
+            <img
+                src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png"
+                alt="Loading..."
+                onerror="this.onerror=null; this.src='https://placehold.co/64x64/cccccc/333333?text=Loading';">
+        </div>
+        <a class="player-close" onclick="history.back()"><svg xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" role="img"><path fill="#FFFFFF" fill-rule="evenodd" d="M6.414 11H21v2H6.414l5.293 5.293-1.414 1.414-7-7a1 1 0 0 1 0-1.414l7-7 1.414 1.414z" clip-rule="evenodd"></path></svg></a>
+    `;
 
     // Scroll modal to top
     modal.scrollTop = 0;
@@ -10930,12 +10941,22 @@ async function playMovie(item, releaseYear) {
     // Show backdrop container
     document.getElementById('modal-backdrop-container').classList.remove('hidden');
 
+    // Show spinner while resolving stream link
+    if (!isDesktop) {
+        playerWrap.innerHTML = spinnerHTML;
+        if (playBtn) playBtn.style.display = 'none';
+    } else {
+        const iframeHolder = document.getElementById('iframe-holder');
+        if (iframeHolder) {
+            iframeHolder.style.display = 'block';
+            iframeHolder.innerHTML = spinnerHTML;
+        }
+    }
+
     // Store current state
     modal.dataset.currentBackdrop = document.getElementById('modal-backdrop')?.src || '';
     modal.dataset.currentMovieId  = item.id;
     history.pushState({}, '', `/watch/movie/${item.id}`);
-
-    if (playBtn) playBtn.style.display = 'none';
 
     let playLink = null;
     let source   = 'none';
@@ -10946,7 +10967,7 @@ async function playMovie(item, releaseYear) {
         const movieTitle = item.title;
         const movieId    = item.id;
 
-        // 1️ Vercel Primary API
+        // 1️⃣ Vercel Primary API
         try {
             const newApiUrl = `https://jj-seven-gray.vercel.app/movie/${movieId}`;
             const newApiRes = await fetch(newApiUrl);
@@ -10957,7 +10978,7 @@ async function playMovie(item, releaseYear) {
                     source   = 'VercelPrimary';
                     console.log(`✅ Vercel Primary API for movie ID ${movieId}: ${playLink}`);
                 } else {
-                    console.warn(`⚠ Vercel API returned empty for movie ID ${movieId}`);
+                    console.warn(`⚠️ Vercel API returned empty for movie ID ${movieId}`);
                 }
             } else {
                 console.warn(`❌ Vercel API status ${newApiRes.status} for movie ID ${movieId}`);
@@ -10966,7 +10987,7 @@ async function playMovie(item, releaseYear) {
             console.error(`⚠️ Vercel API fetch error for movie ID ${movieId}:`, err);
         }
 
-        // 2️⃣ RPM Worker fallback
+        // 2️ RPM Worker fallback
         if (!playLink && movieTitle && releaseYear) {
             const formattedTitle  = formatTitleForHls(movieTitle);
             const dottedTitle     = `${formattedTitle}.${releaseYear}`;
@@ -11036,6 +11057,16 @@ async function playMovie(item, releaseYear) {
         }
     }
 
+    const iframeAttributes = `id="movie-player-iframe" src="${playLink}" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen" allowfullscreen`;
+    const closeButtonMobile = source !== 'github' ? `<a class="player-close" onclick="history.back()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" role="img" viewBox="0 0 24 24" width="24" height="24"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5858 12L2.29291 3.70706L3.70712 2.29285L12 10.5857L20.2929 2.29285L21.7071 3.70706L13.4142 12L21.7071 20.2928L20.2929 21.7071L12 13.4142L3.70712 21.7071L2.29291 20.2928L10.5858 12Z" fill="currentColor"></path></svg></a>` : '';
+
+    if (!isDesktop) {
+        // ── Mobile: inject iframe into playerWrap (original behavior) ──────────
+        playerWrap.innerHTML = `<iframe ${iframeAttributes}></iframe>${closeButtonMobile}`;
+    } else {
+        // ── Desktop: fullscreen modal ──────────────────────────────────────────
+        openPlayerModal(playLink, source);
+    }
 
     // Save to continue watching
     saveToContinueWatching(item.id, 'movie', item.poster_path, item.backdrop_path);
@@ -11045,6 +11076,129 @@ async function playMovie(item, releaseYear) {
     if (movieIframe) {
         setupJJPlayerProgressListener(`movie_${item.id}`, movieIframe);
     }
+}
+
+// ── Desktop fullscreen modal (movie) ──────────────────────────────────────────
+
+function openPlayerModal(playLink, source) {
+    const existing = document.getElementById('player-modal');
+    if (existing) existing.remove();
+
+    const showClose = source !== 'github';
+
+    const styleId = 'player-modal-style';
+    if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            body.player-open {
+                overflow: hidden !important;
+            }
+            #player-modal {
+                position: fixed !important;
+                top: 0 !important; left: 0 !important;
+                width: 100vw !important; height: 100vh !important;
+                background: #000 !important;
+                z-index: 2147483646 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                margin: 0 !important; padding: 0 !important;
+            }
+            #player-modal-inner {
+                position: relative !important;
+                width: 100% !important; height: 100% !important;
+                overflow: hidden !important;
+            }
+            #movie-player-iframe {
+                position: absolute !important;
+                top: 0 !important; left: 0 !important;
+                width: 100% !important; height: 100% !important;
+                border: none !important; background: #000 !important;
+                opacity: 0; transition: opacity 0.4s ease;
+            }
+            #movie-player-iframe.loaded { opacity: 1 !important; }
+            #player-modal-loader {
+                position: absolute !important; inset: 0 !important;
+                display: flex !important; align-items: center !important;
+                justify-content: center !important;
+                background: #000 !important; z-index: 10 !important;
+                transition: opacity 0.3s ease !important;
+            }
+            #player-modal-loader img {
+                width: 64px !important; height: 64px !important;
+                animation: modal-spin 1s linear infinite !important;
+            }
+            @keyframes modal-spin {
+                from { transform: rotate(0deg); }
+                to   { transform: rotate(360deg); }
+            }
+            #modal-close-btn {
+                position: fixed !important;
+                top: 14px !important; right: 14px !important;
+                z-index: 2147483647 !important;
+                background: rgba(0,0,0,0.75) !important;
+                border: none !important; border-radius: 50% !important;
+                width: 44px !important; height: 44px !important;
+                cursor: pointer !important; color: #fff !important;
+                font-size: 22px !important;
+                display: flex !important; align-items: center !important;
+                justify-content: center !important;
+                backdrop-filter: blur(6px) !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const closeBtn = showClose ? `
+        <button id="modal-close-btn" onclick="closePlayerModal()">✕</button>` : '';
+
+    const modal = document.createElement('div');
+    modal.id = 'player-modal';
+    modal.innerHTML = `
+        <div id="player-modal-inner">
+            <div id="player-modal-loader">
+                <img src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png"
+                     onerror="this.onerror=null;this.src='https://placehold.co/64x64/000/fff?text=...'">
+            </div>
+            <iframe
+                id="movie-player-iframe"
+                src="${playLink}"
+                frameborder="0"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowfullscreen>
+            </iframe>
+            ${closeBtn}
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.classList.add('player-open');
+
+    const iframe = document.getElementById('movie-player-iframe');
+    const loader = document.getElementById('player-modal-loader');
+
+    const loaderFallback = setTimeout(() => {
+        if (iframe) iframe.classList.add('loaded');
+        if (loader) loader.remove();
+    }, 5000);
+
+    iframe.addEventListener('load', () => {
+        clearTimeout(loaderFallback);
+        iframe.classList.add('loaded');
+        if (loader) {
+            loader.style.opacity = '0';
+            setTimeout(() => loader.remove(), 300);
+        }
+    });
+}
+
+function closePlayerModal() {
+    const modal = document.getElementById('player-modal');
+    if (modal) modal.remove();
+    document.body.classList.remove('player-open');
+    document.body.style.overflow = '';
+    history.back();
 }
 
 // openModal Script
