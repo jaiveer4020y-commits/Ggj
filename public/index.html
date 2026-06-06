@@ -12780,7 +12780,8 @@ function displayMyList() {
         img.alt = `${item.mediaType} poster`;
 
         // Add click event to open modal
-        card.onclick = () => openModal(item.id, item.mediaType);
+        card.onclick = () => openTmdbModal(item.id, item.mediaType);
+
 
         // Append image to card
         card.appendChild(img);
