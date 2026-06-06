@@ -12598,14 +12598,8 @@ async function playEpisode(seriesName, seasonNumber, episodeNumber, seriesId, un
     }
 }
 
-    } else {
-        playerWrap.innerHTML = `
-            <div style="display: flex; justify-content: center; align-items: center; height: 100%; color: white; font-size: 1.2em;">Error: No playable content found.</div>
-            <a class="modal-close" onclick="history.back)"></a>
-        `;
-        console.error(`No play URL found for TV episode TMDB ID ${seriesId} S${seasonNumber}E${episodeNumber}.`);
-    }
-}
+ 
+
 function closeModal() {
     if (window.progressInterval) {
         clearInterval(window.progressInterval);
