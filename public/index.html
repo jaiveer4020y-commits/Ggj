@@ -10913,96 +10913,69 @@ async function handleEpisodeDownload(btn) {
     }, 2000);
   }
 }
-
-/**
- * playMovie(item, releaseYear)
- * Resolves the streaming link for a movie and injects the player iframe.
- * Called when the user clicks the Watch / Resume button in the movie modal.
- *
- * @param {object} item         - TMDB movie object (must have .id, .title, .poster_path, .backdrop_path)
- * @param {string} releaseYear  - 4-digit release year string
- */
 async function playMovie(item, releaseYear) {
     const modal      = document.getElementById('tmdb-modal');
     const playerWrap = document.getElementById('playerWrap');
     const playBtn    = document.getElementById('modal-play');
-    const isDesktop  = window.innerWidth >= 1024;
-
-    const spinnerHTML = `
-        <div class="loading-spinner-container">
-            <img
-                src="https://assets.nflxext.com/en_us/pages/wiplayer/site-spinner.png"
-                alt="Loading..."
-                onerror="this.onerror=null; this.src='https://placehold.co/64x64/cccccc/333333?text=Loading';">
-        </div>
-        <a class="player-close" onclick="history.back()"><svg xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" role="img"><path fill="#FFFFFF" fill-rule="evenodd" d="M6.414 11H21v2H6.414l5.293 5.293-1.414 1.414-7-7a1 1 0 0 1 0-1.414l7-7 1.414 1.414z" clip-rule="evenodd"></path></svg></a>
-    `;
 
     // Scroll modal to top
     modal.scrollTop = 0;
 
-    // Destroy the YouTube trailer player if active
+    // Destroy YouTube trailer player if active
     if (typeof player !== 'undefined' && player) {
         player.destroy();
         player = null;
     }
 
-    // Show backdrop container (was hidden by trailer)
+    // Show backdrop container
     document.getElementById('modal-backdrop-container').classList.remove('hidden');
-
-    // Show spinner while resolving stream link
-    if (!isDesktop) {
-        // Mobile: spinner inside playerWrap
-        playerWrap.innerHTML = spinnerHTML;
-        if (playBtn) playBtn.style.display = 'none';
-    } else {
-        // Desktop: spinner inside iframe-holder
-        const iframeHolder = document.getElementById('iframe-holder');
-        if (iframeHolder) {
-            iframeHolder.style.display = 'block';
-            iframeHolder.innerHTML = spinnerHTML;
-        } else {
-            console.error('playMovie: iframe-holder not found in DOM');
-        }
-    }
 
     // Store current state
     modal.dataset.currentBackdrop = document.getElementById('modal-backdrop')?.src || '';
     modal.dataset.currentMovieId  = item.id;
     history.pushState({}, '', `/watch/movie/${item.id}`);
 
-    // Resolve the streaming link (inlined: GitHub HLS -> RPM Worker -> Videasy fallback)
+    if (playBtn) playBtn.style.display = 'none';
+
     let playLink = null;
-    let source = 'none';
+    let source   = 'none';
 
     if (!item.id) {
-        console.warn('❌ playMovie: Missing movie ID, cannot fetch links.');
+        console.warn('❌ playMovie: Missing movie ID.');
     } else {
         const movieTitle = item.title;
         const movieId    = item.id;
 
-  try {
+        // 1️ Vercel Primary API
+        try {
             const newApiUrl = `https://jj-seven-gray.vercel.app/movie/${movieId}`;
             const newApiRes = await fetch(newApiUrl);
             if (newApiRes.ok) {
                 const responseText = await newApiRes.text();
                 if (responseText && responseText.trim().length > 0) {
                     playLink = newApiUrl;
-                    source = 'VercelPrimary';
-					// Inside playMovie function, after frame.src = playLink;
-
+                    source   = 'VercelPrimary';
                     console.log(`✅ Vercel Primary API for movie ID ${movieId}: ${playLink}`);
+                } else {
+                    console.warn(`⚠ Vercel API returned empty for movie ID ${movieId}`);
+                }
+            } else {
+                console.warn(`❌ Vercel API status ${newApiRes.status} for movie ID ${movieId}`);
+            }
+        } catch (err) {
+            console.error(`⚠️ Vercel API fetch error for movie ID ${movieId}:`, err);
+        }
 
-        // 2️⃣ Try RPM Worker — only if GitHub didn't work
+        // 2️⃣ RPM Worker fallback
         if (!playLink && movieTitle && releaseYear) {
-            const formattedTitle   = formatTitleForHls(movieTitle);
-            const dottedTitle      = `${formattedTitle}.${releaseYear}`;
-            const rpmWorkerApiUrl  = `${RPM_WORKER_BASE_URL}?title=${encodeURIComponent(dottedTitle)}`;
+            const formattedTitle  = formatTitleForHls(movieTitle);
+            const dottedTitle     = `${formattedTitle}.${releaseYear}`;
+            const rpmWorkerApiUrl = `${RPM_WORKER_BASE_URL}?title=${encodeURIComponent(dottedTitle)}`;
             try {
                 const rpmRes  = await fetch(rpmWorkerApiUrl);
                 const rpmData = await rpmRes.json();
                 if (rpmData?.result?.files?.length > 0) {
-                    const fileCode    = rpmData.result.files[0].file_code;
+                    const fileCode      = rpmData.result.files[0].file_code;
                     const playerBaseUrl = await getRegionBasedPlayerBaseUrl();
                     playLink = `${playerBaseUrl}/#${fileCode}&api=all`;
                     source   = 'RPM';
@@ -11015,11 +10988,11 @@ async function playMovie(item, releaseYear) {
             }
         }
 
-        // 3️⃣ Try Page API — only if GitHub and RPM Worker didn't work
+        // 3️⃣ Page API fallback
         if (!playLink && movieTitle && releaseYear) {
-            const formattedTitle  = formatTitleForHls(movieTitle);
-            const dottedTitle     = `${formattedTitle}.${releaseYear}`;
-            const pageApiUrl      = `/api/rpm?search=${encodeURIComponent(dottedTitle)}`;
+            const formattedTitle = formatTitleForHls(movieTitle);
+            const dottedTitle    = `${formattedTitle}.${releaseYear}`;
+            const pageApiUrl     = `/api/rpm?search=${encodeURIComponent(dottedTitle)}`;
             try {
                 const pageRes  = await fetch(pageApiUrl);
                 if (!pageRes.ok) throw new Error(`Page API error: ${pageRes.status}`);
@@ -11034,12 +11007,12 @@ async function playMovie(item, releaseYear) {
                     console.warn(`⚠️ No Page API results for "${movieTitle}" (${dottedTitle}).`);
                 }
             } catch (err) {
-                console.error(`⚠️ Page API error for "${movieTitle}" (${err.message}), trying Youout mirror...`);
-                // Mirror fallback: Youout API (same response format as Page API)
+                console.error(`⚠️ Page API error for "${movieTitle}", trying Youout mirror...`);
                 try {
-                    const yououtApiUrl = `https://youout.vercel.app/api/videos?search=${encodeURIComponent(dottedTitle)}`;
-                    const yououtRes    = await fetch(yououtApiUrl);
-                    const yououtData   = await yououtRes.json();
+                    const dottedTitle2  = `${formatTitleForHls(movieTitle)}.${releaseYear}`;
+                    const yououtApiUrl  = `https://youout.vercel.app/api/videos?search=${encodeURIComponent(dottedTitle2)}`;
+                    const yououtRes     = await fetch(yououtApiUrl);
+                    const yououtData    = await yououtRes.json();
                     if (yououtData?.data?.length > 0) {
                         const fileCode      = yououtData.data[0].id;
                         const playerBaseUrl = await getRegionBasedPlayerBaseUrl();
@@ -11047,7 +11020,7 @@ async function playMovie(item, releaseYear) {
                         source   = 'YououtAPI';
                         console.log(`✅ Youout mirror link for "${movieTitle}": ${playLink}`);
                     } else {
-                        console.warn(`⚠️ No Youout mirror results for "${movieTitle}" (${dottedTitle}).`);
+                        console.warn(`⚠️ No Youout mirror results for "${movieTitle}".`);
                     }
                 } catch (yououtErr) {
                     console.error(`⚠️ Youout mirror fetch error for "${movieTitle}":`, yououtErr);
@@ -11055,7 +11028,7 @@ async function playMovie(item, releaseYear) {
             }
         }
 
-        // 4️⃣ Fallback to Videasy — only if still no link
+        // 4️⃣ Videasy final fallback
         if (!playLink) {
             playLink = `https://player.videasy.net/movie/${movieId}`;
             source   = 'Videasy';
@@ -11063,36 +11036,17 @@ async function playMovie(item, releaseYear) {
         }
     }
 
-    const iframeAttributes = `id="movie-player-iframe" src="${playLink}" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen" allowfullscreen style="aspect-ratio: 16/9;"`;
+    // ── Open fullscreen modal ──────────────────────────────────────────────────
+    openPlayerModal(playLink, source);
 
-    const closeButtonMobile  = source !== 'github' ? `<a class="player-close" onclick="history.back()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" role="img" viewBox="0 0 24 24" width="24" height="24"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5858 12L2.29291 3.70706L3.70712 2.29285L12 10.5857L20.2929 2.29285L21.7071 3.70706L13.4142 12L21.7071 20.2928L20.2929 21.7071L12 13.4142L3.70712 21.7071L2.29291 20.2928L10.5858 12Z" fill="currentColor"></path></svg></a>` : '';
-    const closeButtonDesktop = source !== 'github' ? `<a class="player-close" onclick="playerClose()"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="#FFFFFF" fill-rule="evenodd" d="M6.414 11H21v2H6.414l5.293 5.293-1.414 1.414-7-7a1 1 0 0 1 0-1.414l7-7 1.414 1.414z"></path></svg></a>` : '';
-
-    if (!isDesktop) {
-        // Mobile: inject iframe into playerWrap
-        playerWrap.innerHTML = `<iframe ${iframeAttributes}></iframe>${closeButtonMobile}`;
-    } else {
-        // Desktop: inject iframe into iframe-holder
-        const iframeHolder = document.getElementById('iframe-holder');
-        if (iframeHolder) {
-            iframeHolder.innerHTML = `<iframe ${iframeAttributes}></iframe>${closeButtonDesktop}`;
-        } else {
-            console.error('playMovie: iframe-holder not found after link resolution');
-            playerWrap.innerHTML = `
-                <div style="display:flex;justify-content:center;align-items:center;height:100%;color:white;font-size:1.2em;">
-                    Error: Player container not found.
-                </div>
-                <a class="modal-close" onclick="history.back()"></a>
-            `;
-        }
-    }
-
-    // Open ad in new tab
-    window.open('https://otieu.com/4/9119528', '_blank');
-
-    // Save to continue watching and set up progress listener
+    // Save to continue watching
     saveToContinueWatching(item.id, 'movie', item.poster_path, item.backdrop_path);
-    setupPlayerListener(`movie_${item.id}`);
+
+    // Setup progress listener
+    const movieIframe = document.getElementById('movie-player-iframe');
+    if (movieIframe) {
+        setupJJPlayerProgressListener(`movie_${item.id}`, movieIframe);
+    }
 }
 
 // openModal Script
