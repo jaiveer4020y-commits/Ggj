@@ -10988,7 +10988,7 @@ async function playMovie(item, releaseYear) {
             if (githubRes.ok) {
                 const fileCode = (await githubRes.text()).trim();
                 if (fileCode) {
-                    playLink = `https://watchout-player.netlify.app/movie/${movieId}`;
+                    playLink = `https://jj-seven-gray.vercel.app/movie/${movieId}`;
                     source   = 'github';
                     console.log(`✅ GitHub HLS for "${movieTitle}": ${fileCode}`);
                 } else {
