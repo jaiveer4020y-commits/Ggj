@@ -10703,7 +10703,7 @@ function displayProgressBar(targetElement, progress) {
 }
 
 window.addEventListener('message', (event) => {
-    if (event.origin !== 'https://watchout-player.netlify.app') return;
+    if (event.origin !== 'https://jj-seven-gray.vercel.app') return;
     const data = event.data;
     if (!data || data.event !== 'videoTimeUpdate') return;
     // Build uniqueContentId from the message itself — no need to track separately
