@@ -10969,7 +10969,7 @@ async function playMovie(item, releaseYear) {
 
         // 1️⃣ Vercel Primary API
         try {
-            const newApiUrl = `https://jj-seven-gray.vercel.app/movie/${movieId}`;
+            const newApiUrl = `https://jj-seven-gray.vercel.app/movie/${imdbId}`;
             const newApiRes = await fetch(newApiUrl);
             if (newApiRes.ok) {
                 const responseText = await newApiRes.text();
